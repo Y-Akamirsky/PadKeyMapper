@@ -1,0 +1,28 @@
+{
+    "mappings": [
+        {
+            "type": "note",
+            "id": 36,
+            "keys": ["Key.ctrl", "Key.shift", "1"],
+            "description": "Launchpad A1 (Тест Ctrl+Shift+1)"
+        },
+        {
+            "type": "note",
+            "id": 99,
+            "keys": ["Key.cmd", "w"],
+            "description": "Launchpad H8 (Закрыть окно)"
+        },
+        {
+            "type": "cc",
+            "id": 104,
+            "keys": ["Key.alt", "u"],
+            "description": "Верхний ряд: UP"
+        },
+        {
+            "type": "cc",
+            "id": 111,
+            "keys": ["Key.shift", "m"],
+            "description": "Верхний ряд: MIXER"
+        }
+    ]
+}
