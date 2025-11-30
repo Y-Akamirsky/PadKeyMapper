@@ -2,14 +2,17 @@ import sys
 import time
 import json
 import threading
+# Импортируем Menu из стандартного Tkinter, так как CTkContextMenu отсутствует
 import tkinter as tk
 import customtkinter as ctk
 
+# НОВАЯ БИБЛИОТЕКА ВВОДА для Wayland
 import uinput
-from mido import get_input_names, open_input, open_output, Message
+from mido import get_input_names, open_input
 
 # --- 1. СЛОВАРИ И ПРЕОБРАЗОВАНИЕ КЛАВИШ ---
 
+# Словарь для преобразования строковых имен из config.json в константы uinput.
 KEY_MAPPINGS = {
     # Модификаторы и системные
     'Key.ctrl': uinput.KEY_LEFTCTRL,
@@ -47,8 +50,9 @@ KEY_MAPPINGS = {
     'Key.print_screen': uinput.KEY_SYSRQ,
 }
 
-
+# Обратный словарь для чистого вывода в терминал
 REVERSE_KEY_MAPPINGS = {v: k.replace('Key.', '') for k, v in KEY_MAPPINGS.items()}
+# Добавляем обычные буквы/цифры в обратный словарь
 for c in 'abcdefghijklmnopqrstuvwxyz0123456789':
     try:
         REVERSE_KEY_MAPPINGS[getattr(uinput, f'KEY_{c.upper()}')] = c.upper()
@@ -60,22 +64,23 @@ for c in 'abcdefghijklmnopqrstuvwxyz0123456789':
 
 def load_config(filename="config.json"):
     """Загружает конфигурацию из JSON и формирует словари маппинга и список для таблицы."""
+
     key_map = {}
     cc_map = {}
-    all_mappings_data = []
+    all_mappings_data = [] # Новый список для отображения в GUI
 
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except Exception:
         print(f"❌ Ошибка загрузки или парсинга {filename}. Используем пустую конфигурацию.")
+        # ВОЗВРАЩАЕМ ТРИ ЭЛЕМЕНТА!
         return key_map, cc_map, all_mappings_data
 
     for mapping in data.get('mappings', []):
         m_type = mapping.get('type')
         m_id = mapping.get('id')
         m_keys_str = mapping.get('keys', [])
-        m_color = mapping.get('color', 0)
 
         keys_to_press = []
         for key_str in m_keys_str:
@@ -87,44 +92,50 @@ def load_config(filename="config.json"):
                 except AttributeError:
                     print(f"⚠️ Неизвестный символ: {key_str}")
 
+        # Сбор данных для таблицы
         all_mappings_data.append({
             'type': m_type,
             'id': m_id,
             'keys_str': m_keys_str,
-            'description': mapping.get('description', '—'),
-            'color': m_color
+            # Читаем описание из конфига (по умолчанию пустая строка)
+            'description': mapping.get('description', '—')
         })
 
         if m_type == 'note':
+            # Принудительно преобразуем ID в int для ключей словаря
             try:
-                key_map[int(m_id)] = {'keys': keys_to_press, 'color': m_color}
+                key_map[int(m_id)] = keys_to_press
             except (ValueError, TypeError):
-                 key_map[m_id] = {'keys': keys_to_press, 'color': m_color}
+                 key_map[m_id] = keys_to_press # Если не число, оставляем как есть
         elif m_type == 'cc':
+            # Принудительно преобразуем ID в int для ключей словаря
             try:
-                cc_map[int(m_id)] = {'keys': keys_to_press, 'color': m_color}
+                cc_map[int(m_id)] = keys_to_press
             except (ValueError, TypeError):
-                 cc_map[m_id] = {'keys': keys_to_press, 'color': m_color}
+                 cc_map[m_id] = keys_to_press # Если не число, оставляем как есть
 
+    # ВОЗВРАЩАЕМ ТРИ ЭЛЕМЕНТА: (key_map, cc_map, all_mappings_data)
     return key_map, cc_map, all_mappings_data
 
+# НОВАЯ ФУНКЦИЯ: Сохранение данных в config.json
 def save_config(mappings_data, filename="config.json"):
     """Сохраняет список маппингов обратно в JSON-файл."""
     data_to_save = {'mappings': []}
 
     for mapping in mappings_data:
+        # Убеждаемся, что мы сохраняем ID как int, если это возможно,
+        # чтобы сохранить чистоту конфига.
         m_id = mapping['id']
         try:
             m_id = int(m_id)
         except ValueError:
-            pass
+            pass # Если не число, оставляем как строку
 
         data_to_save['mappings'].append({
             'type': mapping['type'],
             'id': m_id,
             'keys': mapping['keys_str'],
-            'description': mapping['description'],
-            'color': mapping.get('color', 0)
+            'description': mapping['description']
         })
 
     try:
@@ -138,6 +149,7 @@ def save_config(mappings_data, filename="config.json"):
 
 
 class InputManager:
+    """Класс для управления виртуальной клавиатурой uinput."""
     def __init__(self):
         self.device = None
         all_keys = list(KEY_MAPPINGS.values()) + [getattr(uinput, f'KEY_{c.upper()}') for c in 'abcdefghijklmnopqrstuvwxyz0123456789']
@@ -148,6 +160,7 @@ class InputManager:
             self.device = None
 
     def send_keystroke(self, keys):
+        """Имитирует нажатие и отпускание указанной комбинации клавиш."""
         if not self.device or not keys:
             return
 
@@ -169,31 +182,27 @@ class InputManager:
         display_keys = [REVERSE_KEY_MAPPINGS.get(key, 'UNKNOWN') for key in keys]
         print(f"-> Имитировано (uinput): {' + '.join(display_keys)}")
 
+# Инициализация менеджера ввода
 INPUT_MANAGER = InputManager()
 send_keystroke = INPUT_MANAGER.send_keystroke
 
 # --- 3. КЛАСС СЛУШАТЕЛЯ MIDI (ВЫПОЛНЯЕТСЯ В ПОТОКЕ) ---
 
 class MidiListenerThread(threading.Thread):
-    def __init__(self, key_map, cc_map, port_name, status_callback, midi_output):
+    def __init__(self, key_map, cc_map, port_name, status_callback):
         super().__init__()
         self._stop_event = threading.Event()
         self.key_map = key_map
         self.cc_map = cc_map
         self.port_name = port_name
         self.status_callback = status_callback
-        self.midi_output = midi_output
 
     def stop(self):
         self._stop_event.set()
 
     def run(self):
-        from mido import open_input, Message
+        from mido import open_input
         try:
-            # Отправка команд подсветки при запуске
-            self.status_callback("⚡ Инициализация подсветки Launchpad...")
-            self.send_initial_lighting()
-
             with open_input(self.port_name) as port:
                 self.status_callback(f"✅ Слушаю порт: {self.port_name}")
 
@@ -201,22 +210,17 @@ class MidiListenerThread(threading.Thread):
                     msg = port.receive(block=False)
 
                     if msg:
-                        if msg.type in ['note_on', 'note_off', 'control_change']:
-                            id_value = msg.note if msg.type != 'control_change' else msg.control
-                            print(f"<- Получено MIDI: {msg.type.upper()} ID={id_value}")
-
-
                         # Обработка Note On
                         if msg.type == 'note_on' and msg.velocity > 0:
                             note = msg.note
                             if note in self.key_map:
-                                send_keystroke(self.key_map[note]['keys'])
+                                send_keystroke(self.key_map[note])
 
                         # Обработка Control Change
                         elif msg.type == 'control_change' and msg.value > 0:
                             control = msg.control
                             if control in self.cc_map:
-                                send_keystroke(self.cc_map[control]['keys'])
+                                send_keystroke(self.cc_map[control])
 
                     time.sleep(0.005)
 
@@ -226,40 +230,18 @@ class MidiListenerThread(threading.Thread):
             self.status_callback(f"❌ Ошибка потока: {e}")
             print(f"MIDI Thread Error: {e}")
 
-    # Установка начальной подсветки
-    def send_initial_lighting(self):
-        if not self.midi_output:
-            return
-
-        # Отправка Note Lighting
-        for note_id, data in self.key_map.items():
-            try:
-                msg = Message('note_on', note=int(note_id), velocity=int(data['color']))
-                self.midi_output.send(msg)
-            except Exception as e:
-                print(f"Ошибка подсветки Note {note_id}: {e}")
-
-        # Отправка CC Lighting
-        for cc_id, data in self.cc_map.items():
-            try:
-                if 104 <= cc_id <= 111:
-                    msg = Message('control_change', control=int(cc_id), value=int(data['color']))
-                    self.midi_output.send(msg)
-            except Exception as e:
-                print(f"Ошибка подсветки CC {cc_id}: {e}")
-
 # --- 4. КЛАССЫ GUI ---
 
+# НОВЫЙ СЛОВАРЬ для контекстного меню
 READABLE_KEY_NAMES = {
     "Meta/Win": "Key.cmd", "Ctrl": "Key.ctrl", "Shift": "Key.shift", "Alt": "Key.alt",
     "Enter": "Key.enter", "Tab": "Key.tab", "Esc": "Key.esc", "Backspace": "Key.backspace",
-    "Delete": "Key.delete", "Home": "Key.home", "F1": "Key.f1", "F12": "Key.f12",
-    "A-Z, 0-9 (символ)": "a"
-}
-
-LAUNCHPAD_COLORS = {
-    0: "Off", 3: "Red Full (3)", 7: "Amber/Yellow Full (7)", 15: "Green Full (15)",
-    41: "Blue Low (41)", 61: "Pure Yellow (61)", 63: "White Full (63)",
+    "Delete": "Key.delete", "Space": "Key.space",
+    "F1": "Key.f1", "F2": "Key.f2", "F3": "Key.f3", "F4": "Key.f4", "F5": "Key.f5", "F6": "Key.f6",
+    "F7": "Key.f7", "F8": "Key.f8", "F9": "Key.f9", "F10": "Key.f10", "F11": "Key.f11", "F12": "Key.f12",
+    "Home": "Key.home", "End": "Key.end", "Page Up": "Key.page_up", "Page Down": "Key.page_down",
+    "Up Arrow": "Key.up", "Down Arrow": "Key.down", "Left Arrow": "Key.left", "Right Arrow": "Key.right",
+    "A-Z, 0-9 (символ)": "a" # Подсказка
 }
 
 
@@ -267,10 +249,12 @@ LAUNCHPAD_COLORS = {
 class EditMappingWindow(ctk.CTkToplevel):
     def __init__(self, master, mapping_data, index):
         super().__init__(master)
+        # Если это новая запись, используем временный заголовок
         title_id = mapping_data['id'] if mapping_data['id'] != 'NEW' else 'Новое'
         self.title(f"Редактирование: {mapping_data['type'].upper()} {title_id}")
 
-        self.minsize(550, 700)
+        # Geometrical fixes
+        self.minsize(450, 500) # Увеличили размер, чтобы вместить лейаут
 
         self.mapping_data = mapping_data
         self.index = index
@@ -279,58 +263,73 @@ class EditMappingWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=3)
 
-        self.grid_rowconfigure(5, weight=1)
+        # Строки: 0, 1, 2, 3 (заголовок фрейма), 4 (фрейм лейаута), 5 (Save), 6 (Cancel)
+        self.grid_rowconfigure(4, weight=1)
 
         self.create_widgets()
 
+        # Перемещение grab_set() и принудительный рендеринг (для Linux/Wayland)
         self.grab_set()
         self.after(100, lambda: self.attributes("-topmost", True))
         self.after(200, self.lift)
 
+    # ИСПРАВЛЕНО: Теперь используем стандартный tkinter.Menu
     def show_key_menu(self, event):
+        """Создает и отображает контекстное меню при правом клике."""
         self.show_key_menu_from_button(self.keys_entry, event.x_root, event.y_root)
 
+    # ИСПРАВЛЕНО: Теперь используем стандартный tkinter.Menu
     def show_key_menu_from_button(self, entry_widget, x=None, y=None):
+        """Создает и отображает контекстное меню (вызывается кнопкой или правым кликом)."""
+
         if x is None:
-            x = entry_widget.winfo_rootx() + entry_widget.winfo_width() - 50
+            # Если вызвано кнопкой, вычисляем позицию
+            x = entry_widget.winfo_rootx() + entry_widget.winfo_width() - 50 # Сдвиг влево
             y = entry_widget.winfo_rooty() + entry_widget.winfo_height()
 
+        # Используем стандартный tk.Menu
         menu = tk.Menu(self, tearoff=0)
 
-        sorted_keys = sorted(KEY_MAPPINGS.keys())
-        for key_name in sorted_keys:
-             key_value = key_name
-             menu.add_command(label=key_name, command=lambda val=key_value: self.insert_key(val))
-
-        menu.add_separator()
-        menu.add_command(label="A-Z, 0-9 (символ)", state="disabled")
+        for readable_name, key_value in READABLE_KEY_NAMES.items():
+            if key_value == "a":
+                 # Добавляем подсказку как неактивный пункт
+                 menu.add_command(label=readable_name, state="disabled")
+            else:
+                 menu.add_command(label=readable_name, command=lambda val=key_value: self.insert_key(val))
 
         menu.tk_popup(x, y)
 
+    # НОВАЯ ФУНКЦИЯ: Вставка выбранной клавиши
     def insert_key(self, key_value):
+        """Вставляет выбранное значение клавиши в поле Entry."""
         current_text = self.keys_entry.get().strip()
 
+        # Проверяем, нужно ли добавить разделитель
         if current_text and not (current_text.endswith("+") or current_text.endswith(" ")):
             new_text = f"{current_text} + {key_value}"
         else:
+            # Если поле пусто или уже заканчивается на +, просто добавляем ключ
             new_text = f"{current_text}{key_value}"
 
         self.keys_entry.delete(0, 'end')
         self.keys_entry.insert(0, new_text)
 
-    def map_midi_pad(self, midi_id, midi_type):
-        """Автоматически заносит выбранный MIDI ID и Тип в поле Entry."""
+    # НОВАЯ ФУНКЦИЯ: Обработка нажатия на виртуальный пэд
+    def map_midi_pad(self, midi_id):
+        """Автоматически заносит выбранный MIDI ID в поле Entry."""
 
-        current_mapping_id = self.mapping_data.get('id', 'NEW')
-
-        if current_mapping_id == 'NEW' and self.id_entry:
-            self.type_var.set(midi_type)
+        # Если это новая запись, обновляем поле ID
+        if self.mapping_data['id'] == 'NEW' and self.id_entry:
+            # Устанавливаем тип на "note" (если это пэд)
+            self.type_var.set('note')
             self.id_entry.delete(0, 'end')
             self.id_entry.insert(0, str(midi_id))
-            self.master_app.update_status_label(f"💡 {midi_type.upper()} ID: {midi_id} выбран.")
+            self.master_app.update_status_label(f"💡 MIDI ID: {midi_id} выбран. Не забудьте сохранить.")
+
 
     def create_widgets(self):
-        # 1. Поле ID и Тип
+        # 1. Поле ID и Тип (для редактирования ID, если это новая запись)
+        # ... (существующий код для ID и Типа) ...
         ctk.CTkLabel(self, text="MIDI Тип/ID:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=10, sticky="w")
 
         if self.mapping_data['id'] == 'NEW':
@@ -348,118 +347,82 @@ class EditMappingWindow(ctk.CTkToplevel):
             self.id_entry = None
             self.type_var = ctk.StringVar(value=self.mapping_data['type'])
 
-        # 2. Поле Клавиш и Описание
+
+        # 2. Поле Клавиш (для редактирования)
         ctk.CTkLabel(self, text="Клавиши (через +):", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, padx=10, pady=10, sticky="w")
+
         keys_str = " + ".join(self.mapping_data['keys_str'])
         self.keys_entry = ctk.CTkEntry(self, placeholder_text="например: Key.ctrl + C")
         self.keys_entry.insert(0, keys_str)
-        menu_button = ctk.CTkButton(self, text="⌨️", width=30, command=lambda: self.show_key_menu_from_button(self.keys_entry))
+
+        menu_button = ctk.CTkButton(self, text="⌨️", width=30,
+                                    command=lambda: self.show_key_menu_from_button(self.keys_entry))
+
         self.keys_entry.grid(row=1, column=1, padx=(10, 50), pady=10, sticky="ew")
         menu_button.grid(row=1, column=1, padx=(0, 10), pady=10, sticky="e")
+
         self.keys_entry.bind("<Button-3>", self.show_key_menu)
 
-        # 3. Поле Описания
+
+        # 3. Поле Описания (для редактирования)
         ctk.CTkLabel(self, text="Описание:", font=ctk.CTkFont(weight="bold")).grid(row=2, column=0, padx=10, pady=10, sticky="w")
         self.desc_entry = ctk.CTkEntry(self, placeholder_text="Назначение для этого элемента")
         self.desc_entry.insert(0, self.mapping_data['description'])
         self.desc_entry.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
 
-        # 4. Поле Цвета
-        ctk.CTkLabel(self, text="Цвет подсветки (Velocity):", font=ctk.CTkFont(weight="bold")).grid(row=3, column=0, padx=10, pady=10, sticky="w")
+        # --- 4. Визуальный MIDI-лейаут ---
 
-        initial_color = self.mapping_data.get('color', 0)
-        initial_color_name = LAUNCHPAD_COLORS.get(initial_color, f"Custom ({initial_color})")
+        # ИСПРАВЛЕНО: Используем отдельный Label для заголовка фрейма
+        ctk.CTkLabel(self, text="Виртуальный Launchpad (Note ID)", font=ctk.CTkFont(weight="bold")).grid(row=3, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="nsw")
 
-        self.color_var = ctk.StringVar(value=initial_color_name)
-        color_values = [f"{v} ({k})" for k, v in LAUNCHPAD_COLORS.items()]
-        self.color_select = ctk.CTkOptionMenu(self, values=color_values, variable=self.color_var)
-        self.color_select.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
-
-        # --- 5. Визуальный MIDI-лейаут ---
-
-        ctk.CTkLabel(self, text="Виртуальный Launchpad (Лейаут)", font=ctk.CTkFont(weight="bold")).grid(row=4, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="nsw")
-
+        # ИСПРАВЛЕНО: Создаем обычный CTkFrame без аргументов label_text/label_anchor
         midi_frame = ctk.CTkFrame(self, border_width=2)
-        midi_frame.grid(row=5, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="nsew")
+        midi_frame.grid(row=4, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="nsew")
 
-        for i in range(9):
-            midi_frame.grid_columnconfigure(i, weight=1)
-        for i in range(9):
-            midi_frame.grid_rowconfigure(i, weight=1)
+        # 4.1 Виртуальное отображение Launchpad (8x8 сетка)
 
-        # 5.1 CC кнопки (Верхний ряд: Row 0, Cols 0-7) - CC ID: 104-111
-        for c in range(8):
-            cc_id = 104 + c
-            is_current_cc = (self.mapping_data['type'] == 'cc' and self.mapping_data['id'] == cc_id)
-            btn_text = f"CC{cc_id}"
+        # Сетка 8x8 для Note IDs
+        for r in range(8): # Строки (сверху вниз: 8 -> 1)
+            row_midi_base = 8 - r
 
-            cc_button = ctk.CTkButton(midi_frame, text=btn_text, width=30, height=30,
-                                        fg_color=("gray60" if not is_current_cc else "darkorange"),
-                                        command=lambda id=cc_id: self.map_midi_pad(id, 'cc'))
-            cc_button.grid(row=0, column=c, padx=1, pady=1, sticky="nsew")
-
-        ctk.CTkLabel(midi_frame, text="").grid(row=0, column=8, padx=1, pady=1, sticky="nsew")
-
-        # 5.2 Note-сетка (8x8 + 8 боковых)
-        for r_gui in range(8):
-            row_start_id = r_gui * 16
-
-            # Основные пэды (Cols 0-7)
-            for c_gui in range(8):
-                midi_id = row_start_id + c_gui
+            for c in range(8): # Колонки (слева направо: 1 -> 8)
+                col_midi_offset = c + 1
+                midi_id = (row_midi_base * 10) + col_midi_offset
 
                 btn_text = f"N{midi_id}"
-                is_current_note = (self.mapping_data['type'] == 'note' and self.mapping_data['id'] == midi_id)
+
+                is_current_mapping = (self.mapping_data['type'] == 'note' and self.mapping_data['id'] == midi_id)
 
                 pad_button = ctk.CTkButton(midi_frame, text=btn_text, width=30, height=30,
-                                            fg_color=("gray50" if not is_current_note else "teal"),
-                                            command=lambda id=midi_id: self.map_midi_pad(id, 'note'))
-                pad_button.grid(row=r_gui + 1, column=c_gui, padx=1, pady=1, sticky="nsew")
+                                            fg_color=("gray50" if not is_current_mapping else "teal"),
+                                            command=lambda id=midi_id: self.map_midi_pad(id))
+                pad_button.grid(row=r, column=c, padx=1, pady=1, sticky="nsew")
 
-            # Боковые пэды (Col 8) - N8, N24, N40...
-            side_midi_id = row_start_id + 8
+        # Настройка весов для равномерного распределения сетки
+        for i in range(8):
+            midi_frame.grid_columnconfigure(i, weight=1)
+            midi_frame.grid_rowconfigure(i, weight=1)
 
-            btn_text = f"N{side_midi_id}"
-            is_current_side = (self.mapping_data['type'] == 'note' and self.mapping_data['id'] == side_midi_id)
-
-            side_button = ctk.CTkButton(midi_frame, text=btn_text, width=30, height=30,
-                                        fg_color=("gray60" if not is_current_side else "purple"),
-                                        command=lambda id=side_midi_id: self.map_midi_pad(id, 'note'))
-            side_button.grid(row=r_gui + 1, column=8, padx=1, pady=1, sticky="nsew")
-
-        # 6. Кнопки Сохранить и Отмена
+        # 5. Кнопки Сохранить и Отмена (передвигаются вниз)
         save_button = ctk.CTkButton(self, text="💾 Сохранить", command=self.save_and_close)
-        save_button.grid(row=6, column=0, columnspan=2, padx=10, pady=(20, 5), sticky="ew")
+        save_button.grid(row=5, column=0, columnspan=2, padx=10, pady=(20, 5), sticky="ew")
 
         cancel_button = ctk.CTkButton(self, text="Отмена", command=self.destroy)
-        cancel_button.grid(row=7, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
+        cancel_button.grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
 
     def save_and_close(self):
+        """Обрабатывает сохранение данных, обновляет основное приложение и закрывает окно."""
         new_keys_str_raw = self.keys_entry.get().strip()
         new_desc = self.desc_entry.get().strip()
 
-        # 1. Парсинг Цвета (ИСПРАВЛЕНО)
-        selected_color_str = self.color_select.get()
-        new_color_code = 0
-
-        # Извлекаем код цвета, который находится в скобках
-        try:
-            # Например, 'Green Full (15)' -> '15'
-            start_index = selected_color_str.rfind('(')
-            end_index = selected_color_str.rfind(')')
-            if start_index != -1 and end_index != -1 and start_index < end_index:
-                code_str = selected_color_str[start_index + 1:end_index].strip()
-                new_color_code = int(code_str)
-        except:
-            new_color_code = 0
-
-        # 2. Обработка ID и Типа для НОВОЙ записи
+        # 1. Обработка ID и Типа для НОВОЙ записи
         if self.mapping_data['id'] == 'NEW':
             try:
                 new_id = self.id_entry.get().strip()
                 new_type = self.type_var.get()
 
+                # Проверяем, что ID - это число
                 try:
                     new_id_int = int(new_id)
                 except ValueError:
@@ -468,11 +431,14 @@ class EditMappingWindow(ctk.CTkToplevel):
                 if not (0 <= new_id_int <= 127):
                     raise ValueError("ID должен быть в диапазоне 0-127.")
 
+                # Обновляем ID и Тип
                 self.mapping_data['id'] = new_id_int
                 self.mapping_data['type'] = new_type
 
+                # Проверка на дубликаты перед сохранением
                 if self.master_app.is_duplicate_mapping(new_type, new_id_int, self.index):
                      self.master_app.update_status_label(f"❌ Ошибка сохранения: {new_type.upper()} {new_id} уже существует.")
+                     # Удаляем временную запись, так как она не сохранена
                      del self.master_app.mappings_data[self.index]
                      self.master_app.mapping_table.refresh_table()
                      self.destroy()
@@ -482,99 +448,119 @@ class EditMappingWindow(ctk.CTkToplevel):
                 self.master_app.update_status_label(f"❌ Ошибка ID: {e}")
                 return
 
-        # 3. Парсинг комбинации клавиш
+        # 2. Парсинг комбинации клавиш
         new_keys_list = [k.strip() for k in new_keys_str_raw.replace(' ', '').split('+') if k.strip()]
 
-        # 4. Обновляем данные в списке self.mappings_data
+        # 3. Обновляем данные
         self.master_app.mappings_data[self.index]['keys_str'] = new_keys_list
         self.master_app.mappings_data[self.index]['description'] = new_desc
-        self.master_app.mappings_data[self.index]['color'] = new_color_code # <-- Используем корректный код
 
-        # 5. Обновляем основное приложение и сохраняем
+        # 4. Обновляем основное приложение и сохраняем
         self.master_app.update_mappings()
 
         self.destroy()
 
-
+# Существующий класс MappingTableFrame
 class MappingTableFrame(ctk.CTkScrollableFrame):
+    """
+    Класс для отображения назначений клавиш в прокручиваемой таблице.
+    """
     def __init__(self, master, mappings_data, **kwargs):
         super().__init__(master, label_text="Назначения клавиш (Режим просмотра)",
                              label_anchor="w", **kwargs)
         self.mappings_data = mappings_data
         self.app_master = master
 
+        # Настройка сетки для столбцов
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
         self.grid_columnconfigure(2, weight=3)
-        self.grid_columnconfigure(3, weight=0)
-        self.grid_columnconfigure(4, weight=0)
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=0)
+        self.grid_columnconfigure(3, weight=0) # Кнопка Edit
+        self.grid_columnconfigure(4, weight=0) # Кнопка Delete
+        self.grid_rowconfigure(0, weight=0) # Заголовки
+        self.grid_rowconfigure(1, weight=0) # Кнопка Add
 
         self.create_widgets()
 
     def refresh_table(self):
+        """Очищает и пересоздает виджеты для отображения обновленных данных."""
+        # Удаляем все существующие виджеты, кроме заголовков (ряд 1)
+        # Начинаем удалять с ряда 1 (включая кнопку ADD)
         widgets_to_keep = []
         for widget in self.winfo_children():
+            # Защита: оставляем только виджеты, находящиеся в рядах 0 (кнопка Add) и 1 (заголовки)
             if widget.grid_info().get('row') in [0, 1]:
                 widgets_to_keep.append(widget)
             else:
                 widget.destroy()
 
+        # Пересоздаем виджеты
         self.create_widgets()
 
 
     def create_widgets(self):
+        """Создает заголовки, кнопку Add и строки таблицы."""
+
+        # --- 0. Кнопка Добавить (ряд 0) ---
         add_button = ctk.CTkButton(self, text="➕ Добавить новое назначение",
                                      command=self.app_master.add_new_mapping)
         add_button.grid(row=0, column=0, columnspan=5, padx=10, pady=(5, 10), sticky="ew")
 
+        # --- 1. Заголовки (ряд 1) ---
         headers = ["MIDI ID", "Клавиши", "Описание"]
         for col, header_text in enumerate(headers):
             header_label = ctk.CTkLabel(self, text=header_text,
                                              font=ctk.CTkFont(weight="bold"))
             header_label.grid(row=1, column=col, padx=10, pady=(5, 5), sticky="ew")
 
+        # --- 2. Заполнение строк данных (ряд 2 и далее) ---
         for i, mapping in enumerate(self.mappings_data):
+            # Начинаем с ряда 2
             row_num = i + 2
 
+            # ID (Note/CC)
             id_text = f"{mapping['type'].upper()}: {mapping['id']}"
             id_label = ctk.CTkLabel(self, text=id_text)
             id_label.grid(row=row_num, column=0, padx=10, pady=2, sticky="w")
 
+            # Клавиши (Комбинация)
             keys_text = " + ".join(mapping['keys_str'])
             keys_label = ctk.CTkLabel(self, text=keys_text)
             keys_label.grid(row=row_num, column=1, padx=10, pady=2, sticky="ew")
 
+            # Описание
             desc_text = mapping['description']
             desc_label = ctk.CTkLabel(self, text=desc_text)
             desc_label.grid(row=row_num, column=2, padx=10, pady=2, sticky="w")
 
+            # Кнопка Редактировать
             edit_button = ctk.CTkButton(self, text="✎", width=30,
                                              command=lambda index=i: self.app_master.open_edit_window(index))
             edit_button.grid(row=row_num, column=3, padx=(10, 2), pady=2)
 
+            # Кнопка Удалить
             delete_button = ctk.CTkButton(self, text="🗑️", width=30,
                                           fg_color="firebrick", hover_color="red",
                                           command=lambda index=i: self.app_master.delete_mapping(index))
             delete_button.grid(row=row_num, column=4, padx=(2, 10), pady=2)
 
 
+# Установим темную тему по умолчанию для PKM
 ctk.set_appearance_mode("Dark")
 
 # Существующий класс App
 class App(ctk.CTk):
-    def __init__(self, key_map, cc_map, port_name, mappings_data, output_port_name):
+    def __init__(self, key_map, cc_map, port_name, mappings_data):
         super().__init__()
 
-        self.mappings_data = mappings_data
-        self.rebuild_key_cc_maps()
+        # --- Инициализация данных ---
+        self.mappings_data = mappings_data # Список с данными для таблицы (единый источник правды)
+        self.rebuild_key_cc_maps() # Создаем key_map и cc_map из mappings_data
 
         self.port_name = port_name
-        self.output_port_name = output_port_name
         self.listener_thread = None
-        self.midi_output = self.open_midi_output()
 
+        # --- Настройка GUI ---
         self.title("PadKey Mapper: MIDI Hotkey Utility")
         self.geometry("600x450")
         self.minsize(450, 350)
@@ -582,15 +568,21 @@ class App(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
 
+        # 0. Фрейм для настроек темы
         self.settings_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.settings_frame.grid(row=0, column=0, padx=20, pady=5, sticky="ne")
+
+        # Кнопка для смены темы
         self.theme_switch_button = ctk.CTkButton(self.settings_frame, text="🌓", width=30, command=self.toggle_theme)
         self.theme_switch_button.pack(padx=5, pady=5, side="right")
 
+
+        # 1. Заголовок
         self.title_label = ctk.CTkLabel(self, text="PKM: Hotkey Mapper",
                                              font=ctk.CTkFont(size=24, weight="bold"))
         self.title_label.grid(row=1, column=0, padx=20, pady=(5, 5), sticky="ew")
 
+        # 2. Поле статуса
         self.status_label = ctk.CTkLabel(self,
                                              text=f"Порт: {self.port_name}\nСтатус: Остановлено.",
                                              height=60,
@@ -603,59 +595,74 @@ class App(ctk.CTk):
                                              pady=5)
         self.status_label.grid(row=2, column=0, padx=20, pady=(5, 10), sticky="nsew")
 
-        self.mapping_table = MappingTableFrame(self, mappings_data=self.mappings_data)
+        # 3. ТАБЛИЦА НАСТРОЕК
+        self.mapping_table = MappingTableFrame(self,
+                                                 mappings_data=self.mappings_data)
         self.mapping_table.grid(row=3, column=0, padx=20, pady=(0, 10), sticky="nsew")
 
+        # 4. Кнопка Start/Stop
         self.toggle_button = ctk.CTkButton(self, text="▶️ START",
                                              command=self.toggle_listener,
                                              font=ctk.CTkFont(size=16, weight="bold"),
                                              fg_color="green", hover_color="darkgreen")
         self.toggle_button.grid(row=4, column=0, padx=20, pady=(0, 10), sticky="ew")
 
+        # 5. Сообщение о правах sudo
         self.warning_label = ctk.CTkLabel(self, text="⚠️ Для работы требуется запуск с sudo!",
                                              font=ctk.CTkFont(size=10))
         self.warning_label.grid(row=5, column=0, padx=20, pady=(0, 10))
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    # Открытие выходного MIDI-порта
-    def open_midi_output(self):
-        try:
-            return open_output(self.output_port_name)
-        except Exception as e:
-            print(f"❌ Не удалось открыть выходной MIDI-порт {self.output_port_name}: {e}")
-            return None
-
+    # НОВЫЙ МЕТОД: Добавление новой записи
     def add_new_mapping(self):
+        """Создает пустую запись в списке и открывает ее для редактирования."""
+        # Временно используем 'NEW' в качестве ID, чтобы EditMappingWindow понял, что нужно создать поля ввода
         new_mapping = {
-            'type': 'note',
+            'type': 'note', # По умолчанию note
             'id': 'NEW',
             'keys_str': [],
-            'description': 'Новое назначение',
-            'color': 0
+            'description': 'Новое назначение'
         }
         self.mappings_data.append(new_mapping)
         new_index = len(self.mappings_data) - 1
+
+        # Открываем окно редактирования для новой записи
         self.open_edit_window(new_index)
 
+    # НОВЫЙ МЕТОД: Удаление записи
     def delete_mapping(self, index):
+        """Удаляет назначение по индексу и обновляет состояние приложения."""
+
+        # 1. Защита от выхода за границы
         if 0 <= index < len(self.mappings_data):
             deleted_mapping = self.mappings_data.pop(index)
+
+            # 2. Обновляем все: GUI, словари и сохраняем config.json
             self.update_mappings()
+
+            # 3. Сообщаем об успешном удалении
             m_id = deleted_mapping.get('id', 'N/A')
             m_type = deleted_mapping.get('type', 'N/A').upper()
             self.update_status_label(f"✅ Удалено: {m_type} {m_id}. Перезапустите START для применения.")
         else:
             self.update_status_label("❌ Ошибка: Неверный индекс для удаления.")
 
+
+    # НОВЫЙ МЕТОД: Проверка на дубликаты
     def is_duplicate_mapping(self, m_type, m_id, current_index):
+        """Проверяет, существует ли уже запись с таким типом и ID, исключая текущую."""
         for i, mapping in enumerate(self.mappings_data):
+            # Пропускаем текущую запись, которую мы редактируем/создаем
             if i == current_index:
                 continue
+
+            # Сравниваем тип и ID
             if mapping['type'] == m_type and str(mapping['id']) == str(m_id):
                 return True
         return False
 
+    # НОВЫЙ МЕТОД: Обновление словарей после редактирования
     def rebuild_key_cc_maps(self):
         """Перестраивает словари key_map и cc_map из текущих данных mappings_data."""
         self.key_map = {}
@@ -664,8 +671,8 @@ class App(ctk.CTk):
         for mapping in self.mappings_data:
             m_type = mapping['type']
             m_id = mapping['id']
-            m_color = mapping.get('color', 0)
 
+            # Пропускаем временные или невалидные записи
             if m_id == 'NEW':
                 continue
 
@@ -673,122 +680,104 @@ class App(ctk.CTk):
 
             keys_to_press = []
             for key_str in m_keys_str:
+                # Пытаемся преобразовать строку в uinput константу
                 if key_str in KEY_MAPPINGS:
                     keys_to_press.append(KEY_MAPPINGS[key_str])
                 elif len(key_str) == 1 and (key_str.isalpha() or key_str.isdigit()):
                     try:
                         keys_to_press.append(getattr(uinput, f'KEY_{key_str.upper()}'))
                     except AttributeError:
-                        pass
+                        pass # Игнорируем невалидные одиночные символы
 
+            # Используем int(m_id) для надежности при сравнении с mido.note и mido.control
             try:
                 midi_id = int(m_id)
             except (ValueError, TypeError):
-                continue
+                continue # Пропускаем, если ID не число
 
-            data = {'keys': keys_to_press, 'color': m_color}
             if m_type == 'note':
-                self.key_map[midi_id] = data
+                self.key_map[midi_id] = keys_to_press
             elif m_type == 'cc':
-                self.cc_map[midi_id] = data
+                self.cc_map[midi_id] = keys_to_press
 
+
+    # НОВЫЙ МЕТОД: Обработка редактирования
     def open_edit_window(self, index):
+        """Открывает окно редактирования для выбранной записи."""
         mapping_data = self.mappings_data[index]
         EditMappingWindow(self, mapping_data, index)
 
+    # НОВЫЙ МЕТОД: Обновление после сохранения
     def update_mappings(self):
+        """Вызывается после сохранения или удаления записи."""
+
+        # 1. Фильтруем все временные 'NEW' записи
         self.mappings_data = [m for m in self.mappings_data if m['id'] != 'NEW']
+
+        # 2. Перестраиваем словари для потока MIDI
         self.rebuild_key_cc_maps()
+
+        # 3. Обновляем визуальное представление
         self.mapping_table.refresh_table()
+
+        # 4. Сохраняем в JSON
         save_config(self.mappings_data)
 
+        # 5. Предупреждение о необходимости перезапуска (если это не было сделано в delete_mapping)
         if not self.listener_thread or not self.listener_thread.is_alive():
              self.update_status_label("⚠️ Настройки обновлены и сохранены. Нажмите START для применения.")
 
+    # НОВЫЙ МЕТОД: Смена темы
     def toggle_theme(self):
+        """Переключает тему между Dark и Light."""
         current_mode = ctk.get_appearance_mode()
         new_mode = "Light" if current_mode == "Dark" else "Dark"
         ctk.set_appearance_mode(new_mode)
         self.theme_switch_button.configure(text="🌑" if new_mode == "Light" else "🌓")
 
+
     def update_status_label(self, message):
         self.status_label.configure(text=f"Порт: {self.port_name}\nСтатус: {message}")
 
-    # Очистка Launchpad
-    def clear_launchpad(self):
-        if not self.midi_output:
-            return
-        try:
-            self.midi_output.send(Message('note_on', note=0, velocity=0))
-
-            all_ids = list(self.key_map.keys()) + list(self.cc_map.keys())
-            for midi_id in all_ids:
-                if isinstance(midi_id, int):
-                    self.midi_output.send(Message('note_on', note=midi_id, velocity=0))
-        except Exception as e:
-            print(f"Ошибка при очистке Launchpad: {e}")
-
-
     def toggle_listener(self):
         if self.listener_thread is None or not self.listener_thread.is_alive():
-            # START
+            # Перед запуском убедимся, что словари актуальны (особенно после редактирования/удаления)
             self.rebuild_key_cc_maps()
 
             self.listener_thread = MidiListenerThread(
-                self.key_map, self.cc_map, self.port_name, self.update_status_label, self.midi_output
+                self.key_map, self.cc_map, self.port_name, self.update_status_label
             )
             self.listener_thread.start()
 
             self.toggle_button.configure(text="⏹️ STOP", fg_color="red", hover_color="darkred")
         else:
-            # STOP
             self.listener_thread.stop()
-            self.clear_launchpad()
+
             self.toggle_button.configure(text="▶️ START", fg_color="green", hover_color="darkgreen")
             self.update_status_label("🛑 Остановлено.")
 
     def on_closing(self):
-        self.clear_launchpad()
-
         if self.listener_thread is not None and self.listener_thread.is_alive():
             self.listener_thread.stop()
-
-        if self.midi_output:
-             self.midi_output.close()
-
         self.destroy()
 
 # --- 5. ОСНОВНАЯ ТОЧКА ВХОДА ---
 
 if __name__ == "__main__":
-    from mido import get_input_names, get_output_names
+    from mido import get_input_names
 
     KEY_MAP, CC_MAP, ALL_MAPPINGS_DATA = load_config()
 
-    input_port_names = get_input_names()
-    output_port_names = get_output_names()
-
-    selected_in_port = None
-    selected_out_port = None
-
-    if not input_port_names:
+    port_names = get_input_names()
+    if not port_names:
         print("❌ Не найдено MIDI-входов. Подключите Launchpad.")
         sys.exit(1)
 
     try:
-        selected_in_port = next(name for name in input_port_names if "launchpad" in name.lower())
+        selected_port = next(name for name in port_names if "launchpad" in name.lower())
     except StopIteration:
-        selected_in_port = input_port_names[0]
+        selected_port = port_names[0]
 
-    try:
-        selected_out_port = next(name for name in output_port_names if selected_in_port in name)
-    except StopIteration:
-        try:
-            selected_out_port = next(name for name in output_port_names if "launchpad" in name.lower())
-        except StopIteration:
-            selected_out_port = None
-            print("⚠️ Не найден выходной MIDI-порт для подсветки. Подсветка будет неактивна.")
-
-
-    app = App(KEY_MAP, CC_MAP, selected_in_port, ALL_MAPPINGS_DATA, selected_out_port)
+    # Передаем данные таблицы в App
+    app = App(KEY_MAP, CC_MAP, selected_port, ALL_MAPPINGS_DATA)
     app.mainloop()

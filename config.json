@@ -3,26 +3,54 @@
         {
             "type": "note",
             "id": 36,
-            "keys": ["Key.ctrl", "Key.shift", "1"],
-            "description": "Launchpad A1 (Тест Ctrl+Shift+1)"
+            "keys": [
+                "Key.ctrl",
+                "Key.alt",
+                "x"
+            ],
+            "description": "Открыть терминал",
+            "color": 0
         },
         {
             "type": "note",
             "id": 99,
-            "keys": ["Key.cmd", "w"],
-            "description": "Launchpad H8 (Закрыть окно)"
+            "keys": [
+                "Key.cmd",
+                "w"
+            ],
+            "description": "Launchpad H8 (Закрыть окно)",
+            "color": 0
         },
         {
             "type": "cc",
             "id": 104,
-            "keys": ["Key.alt", "u"],
-            "description": "Верхний ряд: UP"
+            "keys": [
+                "Key.cmd",
+                "x"
+            ],
+            "description": "Fullscreen",
+            "color": 0
         },
         {
-            "type": "cc",
-            "id": 111,
-            "keys": ["Key.shift", "m"],
-            "description": "Верхний ряд: MIXER"
+            "type": "note",
+            "id": 65,
+            "keys": [
+                "Key.ctrl",
+                "Key.shift",
+                "s"
+            ],
+            "description": "Новое назначение",
+            "color": 63
+        },
+        {
+            "type": "note",
+            "id": 18,
+            "keys": [
+                "Key.cmd",
+                "r"
+            ],
+            "description": "Screenshot",
+            "color": 9
         }
     ]
 }

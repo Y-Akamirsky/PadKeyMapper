@@ -1,0 +1,25 @@
+{
+    "layouts": [
+        {
+            "name": "Live 9 / Progression (Mini MK2, X)",
+            "note_layout_type": "progression",
+            "note_start_id": 0,
+            "note_step": 16,
+            "cc_type": "cc",
+            "cc_start_id": 104,
+            "cc_count": 8,
+            "side_note_offset": 8
+        },
+        {
+            "name": "Classic Mode (Original, S)",
+            "note_layout_type": "classic",
+            "note_start_id": 11,
+            "note_step": 10,
+            "cc_type": "note",
+            "cc_start_id": 104,
+            "cc_count": 8,
+            "side_note_offset": 8
+        }
+    ],
+    "default_layout": "Live 9 / Progression (Mini MK2, X)"
+}
