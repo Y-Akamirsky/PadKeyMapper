@@ -2,55 +2,62 @@
     "mappings": [
         {
             "type": "note",
-            "id": 36,
+            "id": 8,
             "keys": [
                 "Key.ctrl",
-                "Key.alt",
-                "x"
+                "S"
             ],
-            "description": "Открыть терминал",
-            "color": 0
+            "description": "Save (Ctrl + S)",
+            "color": 3
         },
         {
             "type": "note",
-            "id": 99,
+            "id": 24,
             "keys": [
-                "Key.cmd",
-                "w"
+                "Key.ctrl",
+                "Z"
             ],
-            "description": "Launchpad H8 (Закрыть окно)",
-            "color": 0
-        },
-        {
-            "type": "cc",
-            "id": 104,
-            "keys": [
-                "Key.cmd",
-                "x"
-            ],
-            "description": "Fullscreen",
-            "color": 0
+            "description": "Undo (Ctrl + Z)",
+            "color": 41
         },
         {
             "type": "note",
-            "id": 65,
+            "id": 40,
             "keys": [
                 "Key.ctrl",
-                "Key.shift",
-                "s"
+                "C"
             ],
-            "description": "Новое назначение",
+            "description": "Copy (Ctrl + C)",
+            "color": 61
+        },
+        {
+            "type": "note",
+            "id": 56,
+            "keys": [
+                "Key.ctrl",
+                "V"
+            ],
+            "description": "Paste (Ctrl + V)",
             "color": 63
         },
         {
             "type": "note",
-            "id": 18,
+            "id": 120,
             "keys": [
-                "Key.cmd",
-                "r"
+                "Key.shift",
+                "Key.delete"
             ],
-            "description": "Screenshot",
+            "description": "Full delete",
             "color": 9
+        },
+        {
+            "type": "note",
+            "id": 119,
+            "keys": [
+                "Key.f1"
+            ],
+            "description": "F1",
+            "color": 15
         }
     ]
 }
