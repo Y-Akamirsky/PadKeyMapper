@@ -1,4 +1,0 @@
-# Правило Udev для PadKey Mapper (PKM)
-# Создает группу 'uinput' и предоставляет ей права записи на устройство /dev/uinput.
-# Это позволяет запускать PKM без sudo.
-KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"
