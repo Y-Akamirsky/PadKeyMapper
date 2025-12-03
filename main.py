@@ -1,14 +1,73 @@
+import os
 import sys
 import time
 import json
 import threading
-import tkinter as tk
-import customtkinter as ctk
 
+if sys.platform.startswith('linux') and '/opt/pad-key-mapper' in os.path.abspath(__file__):
+    # Определяем относительный путь до site-packages,
+    # предполагая, что они лежат в /opt/pad-key-mapper/lib/pythonX.Y/site-packages
+
+    # Получаем версию Python (например, "python3.11")
+    py_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+
+    # Формируем путь к локальной site-packages
+    local_site_packages = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'lib',
+        py_version,
+        'site-packages'
+    )
+
+    # Добавляем этот путь в sys.path для поиска модулей
+    if os.path.exists(local_site_packages):
+        sys.path.append(local_site_packages)
+        # print(f"DEBUG: Added custom path: {local_site_packages}") # Убрать для продакшена
+
+# -----------------------------------------------------------------
+
+import tkinter as tk
 import uinput
 import localization
 import constants
 from mido import get_input_names, get_output_names, open_input, open_output, Message
+import customtkinter as ctk
+
+
+
+if getattr(sys, 'frozen', False):
+    # Если запущено как скомпилированный EXE/AppImage
+    BASE_DIR = sys._MEIPASS
+else:
+    # Если запущено как скрипт
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Определение директории для пользовательского конфига
+# Используем $XDG_CONFIG_HOME или ~/.config как дефолт
+# Сначала пытаемся получить $XDG_CONFIG_HOME, иначе используем ~/.config
+xdg_config_home = os.environ.get('XDG_CONFIG_HOME')
+
+# Если запущены через sudo, используем $SUDO_USER для получения домашней папки
+if os.environ.get('SUDO_USER') and not xdg_config_home:
+    user_home = os.path.expanduser(f"~{os.environ.get('SUDO_USER')}")
+    base_config_path = os.path.join(user_home, ".config")
+elif xdg_config_home:
+    base_config_path = xdg_config_home
+else:
+    # Стандартный путь: ~/.config для текущего пользователя
+    base_config_path = os.path.join(os.path.expanduser("~"), ".config")
+
+# Финальный путь: ~/.config/padkey-mapper
+CONFIG_DIR = os.path.join(base_config_path, "padkey-mapper")
+
+# Создаем папку, если ее нет
+if not os.path.exists(CONFIG_DIR):
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+    except Exception as e:
+        # Это должно сработать, если у пользователя есть права на запись в свою папку
+        print(f"❌ Критическая ошибка: Не удалось создать папку конфига {CONFIG_DIR}. Права? {e}")
+
 
 # --- 1. ЛОГИКА КОНВЕРТАЦИИ ЦВЕТОВ ---
 
@@ -29,6 +88,7 @@ COLOR_TRANSLATION_TABLE = {
 # --- 2. УПРАВЛЕНИЕ КОНФИГУРАЦИЕЙ И ВВОДОМ ---
 
 def load_layouts(filename="layouts.json"):
+    path = os.path.join(BASE_DIR, filename)
     default_layout = {
         "type": "Mini",
         "cc_row_start": 104, "cc_row_end": 111,
@@ -45,12 +105,15 @@ def load_layouts(filename="layouts.json"):
     return predefined_layouts
 
 def load_config(filename="config.json"):
+    # ИСПРАВЛЕНО: Теперь path используется для открытия файла
+    path = os.path.join(CONFIG_DIR, filename)
     key_map = {}
     cc_map = {}
     all_mappings_data = []
 
     try:
-        with open(filename, 'r', encoding='utf-8') as f:
+        # Открываем по полному пути
+        with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except Exception:
         return key_map, cc_map, all_mappings_data
@@ -88,6 +151,8 @@ def load_config(filename="config.json"):
     return key_map, cc_map, all_mappings_data
 
 def save_config(mappings_data, filename="config.json"):
+    # ИСПРАВЛЕНО: Теперь path используется для открытия файла
+    path = os.path.join(CONFIG_DIR, filename)
     data_to_save = {'mappings': []}
     for mapping in mappings_data:
         m_id = mapping['id']
@@ -98,7 +163,8 @@ def save_config(mappings_data, filename="config.json"):
             'description': mapping['description'], 'color': mapping.get('color', 0)
         })
     try:
-        with open(filename, 'w', encoding='utf-8') as f:
+        # Открываем по полному пути
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(data_to_save, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:

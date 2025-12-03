@@ -3,10 +3,11 @@
 # --- 0. ЛОКАЛИЗАЦИЯ И НАСТРОЙКИ ---
 # Дефолтный язык (RU или EN)
 CURRENT_LANG = 'EN'
+VERSION = 'Pre-Alpha 0.0.1.0'
 
 L10N = {
     'EN': {
-        'APP_TITLE': "PadKey Mapper v2.2",
+        'APP_TITLE': "PadKey Mapper {version}",
         'STATUS_READY': "Ready.",
         'STATUS_INIT': "⚡ Initializing Launchpad...",
         'STATUS_LISTENING': "✅ Listening: {port_name}",
@@ -42,7 +43,7 @@ L10N = {
         'EDIT_SHOW_LABELS': "Show IDs"
     },
     'RU': {
-        'APP_TITLE': "PadKey Mapper v2.2",
+        'APP_TITLE': "PadKey Mapper {version}",
         'STATUS_READY': "Готов к работе.",
         'STATUS_INIT': "⚡ Инициализация Launchpad...",
         'STATUS_LISTENING': "✅ Слушаю: {port_name}",
@@ -78,6 +79,15 @@ L10N = {
         'EDIT_SHOW_LABELS': "Показать ID"
     }
 }
+
+# --- ПОСТ-ОБРАБОТКА ДЛЯ ВСТАВКИ VERSION ---
+# Проходимся по всем языкам и вставляем актуальную версию в APP_TITLE
+for lang_code, strings in L10N.items():
+    if 'APP_TITLE' in strings:
+        # Форматируем строку, используя переменную VERSION
+        strings['APP_TITLE'] = strings['APP_TITLE'].format(version=VERSION)
+
+# --- КОНЕЦ ПОСТ-ОБРАБОТКИ ---
 
 def get_string(key, default=None, **kwargs):
     """
