@@ -1,0 +1,8 @@
+# Cache & etc
+__pycache__/
+
+# Build
+build/*
+dist/
+AppDir/
+appimagetool-x86_64.AppImage
