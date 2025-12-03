@@ -1,4 +1,4 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: mido
 Version: 1.3.3
 Summary: MIDI Objects for Python
@@ -29,39 +29,38 @@ Classifier: Topic :: Utilities
 Requires-Python: ~=3.7
 Description-Content-Type: text/x-rst
 License-File: LICENSE
-Requires-Dist: importlib_metadata; python_version < "3.8"
 Requires-Dist: packaging
+Requires-Dist: importlib-metadata ; python_version < "3.8"
 Provides-Extra: build-docs
-Requires-Dist: sphinx~=4.3.2; extra == "build-docs"
-Requires-Dist: sphinx-rtd-theme~=1.2.2; extra == "build-docs"
+Requires-Dist: sphinx ~=4.3.2 ; extra == 'build-docs'
+Requires-Dist: sphinx-rtd-theme ~=1.2.2 ; extra == 'build-docs'
 Provides-Extra: check-manifest
-Requires-Dist: check-manifest>=0.49; extra == "check-manifest"
-Provides-Extra: lint-code
-Requires-Dist: ruff~=0.1.6; extra == "lint-code"
-Provides-Extra: lint-reuse
-Requires-Dist: reuse~=1.1.2; extra == "lint-reuse"
-Provides-Extra: ports-pygame
-Requires-Dist: PyGame~=2.5; extra == "ports-pygame"
-Provides-Extra: ports-rtmidi
-Requires-Dist: python-rtmidi~=1.5.4; extra == "ports-rtmidi"
-Provides-Extra: ports-rtmidi-python
-Requires-Dist: rtmidi-python~=0.2.2; extra == "ports-rtmidi-python"
-Provides-Extra: release
-Requires-Dist: twine~=4.0.2; extra == "release"
-Provides-Extra: test-code
-Requires-Dist: pytest~=7.4.0; extra == "test-code"
+Requires-Dist: check-manifest >=0.49 ; extra == 'check-manifest'
 Provides-Extra: dev
-Requires-Dist: mido[check-manifest]; extra == "dev"
-Requires-Dist: mido[lint-code]; extra == "dev"
-Requires-Dist: mido[test-code]; extra == "dev"
-Requires-Dist: mido[lint-reuse]; extra == "dev"
-Requires-Dist: mido[build-docs]; extra == "dev"
-Requires-Dist: mido[release]; extra == "dev"
+Requires-Dist: mido[check-manifest] ; extra == 'dev'
+Requires-Dist: mido[lint-code] ; extra == 'dev'
+Requires-Dist: mido[test-code] ; extra == 'dev'
+Requires-Dist: mido[lint-reuse] ; extra == 'dev'
+Requires-Dist: mido[build-docs] ; extra == 'dev'
+Requires-Dist: mido[release] ; extra == 'dev'
+Provides-Extra: lint-code
+Requires-Dist: ruff ~=0.1.6 ; extra == 'lint-code'
+Provides-Extra: lint-reuse
+Requires-Dist: reuse ~=1.1.2 ; extra == 'lint-reuse'
 Provides-Extra: ports-all
-Requires-Dist: mido[ports-pygame]; extra == "ports-all"
-Requires-Dist: mido[ports-rtmidi]; extra == "ports-all"
-Requires-Dist: mido[ports-rtmidi-python]; extra == "ports-all"
-Dynamic: license-file
+Requires-Dist: mido[ports-pygame] ; extra == 'ports-all'
+Requires-Dist: mido[ports-rtmidi] ; extra == 'ports-all'
+Requires-Dist: mido[ports-rtmidi-python] ; extra == 'ports-all'
+Provides-Extra: ports-pygame
+Requires-Dist: PyGame ~=2.5 ; extra == 'ports-pygame'
+Provides-Extra: ports-rtmidi
+Requires-Dist: python-rtmidi ~=1.5.4 ; extra == 'ports-rtmidi'
+Provides-Extra: ports-rtmidi-python
+Requires-Dist: rtmidi-python ~=0.2.2 ; extra == 'ports-rtmidi-python'
+Provides-Extra: release
+Requires-Dist: twine ~=4.0.2 ; extra == 'release'
+Provides-Extra: test-code
+Requires-Dist: pytest ~=7.4.0 ; extra == 'test-code'
 
 .. SPDX-FileCopyrightText: 2013 Ole Martin Bjorndalen <ombdalen@gmail.com>
 ..

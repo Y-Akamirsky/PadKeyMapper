@@ -1,70 +1,115 @@
-# padkey-mapper.spec
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import os
 import glob
 from PyInstaller.utils.hooks import collect_all
 
-# =========================================================================
-UINPUT_DIR = '/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/uinput'
-UINPUT_SO_PATH = '/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/_libsuinput.cpython-313-x86_64-linux-gnu.so'
-# =========================================================================
+# --- 1. АВТОМАТИЧЕСКИЙ ПОИСК БИБЛИОТЕК ---
+
+# 1.1 Поиск uinput (Усиленный поиск .so файла)
+try:
+    import uinput
+    # Путь к папке пакета 'uinput' (e.g., .../site-packages/uinput)
+    UINPUT_DIR = os.path.dirname(uinput.__file__)
+    # Путь к папке site-packages (родитель UINPUT_DIR)
+    SITE_PACKAGES_DIR = os.path.dirname(UINPUT_DIR)
+
+    # --- Ищем .so файл (начинается с _libsuinput) ---
+
+    # 1. Ищем в корне site-packages (стандартное место для python-uinput)
+    so_files = glob.glob(os.path.join(SITE_PACKAGES_DIR, '_libsuinput*.so'))
+
+    # 2. Если не нашли, ищем в папке пакета uinput (на всякий случай)
+    if not so_files:
+        so_files = glob.glob(os.path.join(UINPUT_DIR, '_libsuinput*.so'))
+
+    # 3. Если все еще не нашли, ищем по более широкой маске в site-packages
+    if not so_files:
+        so_files = glob.glob(os.path.join(SITE_PACKAGES_DIR, '*.so'))
+
+    if not so_files:
+         # <-- Здесь была ошибка. Теперь бросаем ее после всех попыток.
+         raise FileNotFoundError("Не найден .so файл для uinput. Проверьте, что пакет python-uinput установлен корректно.")
+
+    UINPUT_SO_PATH = so_files[0]
+    print(f"✅ Found uinput package at: {UINPUT_DIR}")
+    print(f"✅ Found uinput .so lib at: {UINPUT_SO_PATH}")
+except ImportError:
+    print("❌ Uinput not found! Please install it in this venv.")
+    sys.exit(1)
+
+# 1.2 Поиск CustomTkinter
+try:
+    import customtkinter
+    ctk_path = os.path.dirname(customtkinter.__file__)
+    print(f"✅ Found CustomTkinter at: {ctk_path}")
+except ImportError:
+    print("❌ CustomTkinter not found! Run: pip install customtkinter")
+    sys.exit(1)
 
 
-# --- 1. Файлы данных (datas) ---
+# --- 2. СБОР ДАННЫХ (DATAS) ---
 datas = [
     ('layouts.json', '.'),
     ('PKMICON2.png', '.'),
-    ('pad-key-mapper.desktop', '.')
+    ('pad-key-mapper.desktop', '.'),
+
+    # ПРИНУДИТЕЛЬНО КОПИРУЕМ CUSTOMTKINTER ЦЕЛИКОМ
+    (ctk_path, 'customtkinter'),
+
+    # КОПИРУЕМ UINPUT PYTHON ФАЙЛЫ
+    (os.path.join(UINPUT_DIR, '*.py'), 'uinput')
 ]
 
-# !!! РОБУСТНОЕ РЕШЕНИЕ ДЛЯ UINPUT (ТОЛЬКО .py) !!!
-# (Это гарантирует, что Python-файлы uinput не теряются)
-try:
-    UINPUT_PYTHON_FILES = glob.glob(os.path.join(UINPUT_DIR, '*.py'))
-    datas += [(f, 'uinput') for f in UINPUT_PYTHON_FILES]
-except Exception as e:
-    print(f"Ошибка ручного сбора uinput .py файлов: {e}")
+
+# --- 3. СКРЫТЫЕ ИМПОРТЫ (HIDDENIMPORTS) ---
+hiddenimports = [
+    'sysconfig',
+    'distutils',
+    'tkinter',
+    'PIL._tkinter_finder',
+    # Важные зависимости CTk, которые иногда теряются
+    'customtkinter',
+    'darkdetect',
+    'packaging',
+    'packaging.version',
+    'packaging.specifiers',
+    'packaging.requirements'
+]
+
+# Собираем данные Mido
+tmp_mido = collect_all('mido')
+hiddenimports += ['mido.backends.rtmidi']
+datas += tmp_mido[0]
+hiddenimports += tmp_mido[2]
 
 
-# --- 2. Хуки и явная коллекция ресурсов ---
-# !!! КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ДОБАВЛЯЕМ TKINTER !!!
-# Убираем 'uinput' из hiddenimports, чтобы не конфликтовать с ручным сбором.
-hiddenimports = ['sysconfig', 'distutils', 'tkinter']
+# --- 4. БИНАРНИКИ ---
+# Uinput .so кладем в корень (для загрузчика) и в папку пакета (для питона)
+binaries = [
+    (UINPUT_SO_PATH, '.'),       # Кладем в корень сборки (dist/PadKeyMapper/)
+    (UINPUT_SO_PATH, 'uinput')   # Кладем в папку пакета (dist/PadKeyMapper/uinput)
+]
 
-# Явно собираем customtkinter (должно также включать Tcl/Tk)
-try:
-    tmp_ret = collect_all('customtkinter')
-    datas += tmp_ret[0]
-    hiddenimports += tmp_ret[2]
-except Exception as e:
-    print(f"Ошибка сбора customtkinter: {e}")
+block_cipher = None
 
-# Явно собираем mido
-try:
-    tmp_ret = collect_all('mido')
-    hiddenimports += ['mido.backends.rtmidi']
-    datas += tmp_ret[0]
-    hiddenimports += tmp_ret[2]
-except Exception as e:
-    print(f"Ошибка сбора mido: {e}")
-
-# --- 3. Analysis and build (binaries) ---
 a = Analysis(
     ['main.py', 'constants.py', 'localization.py'],
     pathex=[],
-    # !!! ДОБАВЛЯЕМ C-расширение UINPUT (.so) !!!
-    # Целевая папка 'uinput' соответствует, куда мы скопировали .py файлы.
-    binaries=[(UINPUT_SO_PATH, 'uinput')],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # Убираем 'excludes' для tkinter, так как мы его явно импортируем!
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
     noarchive=False,
 )
-pyz = PYZ(a.pure)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -76,8 +121,14 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True, # Оставь True для отладки
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
 )
+
 coll = COLLECT(
     exe,
     a.binaries,
