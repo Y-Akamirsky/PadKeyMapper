@@ -1,0 +1,2 @@
+#!/bin/bash
+cd /opt/pad-key-mapper && python main.py

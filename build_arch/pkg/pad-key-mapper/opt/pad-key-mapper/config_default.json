@@ -1,0 +1,63 @@
+{
+    "mappings": [
+        {
+            "type": "note",
+            "id": 8,
+            "keys": [
+                "Key.ctrl",
+                "S"
+            ],
+            "description": "Save (Ctrl + S)",
+            "color": 3
+        },
+        {
+            "type": "note",
+            "id": 24,
+            "keys": [
+                "Key.ctrl",
+                "Z"
+            ],
+            "description": "Undo (Ctrl + Z)",
+            "color": 41
+        },
+        {
+            "type": "note",
+            "id": 40,
+            "keys": [
+                "Key.ctrl",
+                "C"
+            ],
+            "description": "Copy (Ctrl + C)",
+            "color": 61
+        },
+        {
+            "type": "note",
+            "id": 56,
+            "keys": [
+                "Key.ctrl",
+                "V"
+            ],
+            "description": "Paste (Ctrl + V)",
+            "color": 63
+        },
+        {
+            "type": "note",
+            "id": 120,
+            "keys": [
+                "Key.shift",
+                "Key.delete"
+            ],
+            "description": "Full delete",
+            "color": 9
+        },
+        {
+            "type": "note",
+            "id": 119,
+            "keys": [
+                "Key.f1"
+            ],
+            "description": "F1",
+            "color": 15
+        }
+    ]
+}
