@@ -395,19 +395,23 @@ class MacroExecutor:
                 threading.Thread(target=self._run_sequence, args=(resolved_keys,)).start()
 
         elif mode == 'Loop':
+            # В режиме Loop мы игнорируем is_note_on=False (velocity=0)
             if is_note_on:
-                # Restart loop if exists
-                if mapping_id in self.active_loops:
-                    self.active_loops[mapping_id].set()
 
+                # Если уже есть запущенная петля — останавливаем (toggle)
+                if mapping_id in self.active_loops:
+                    print(f"[LOOP] Stop loop {mapping_id}")
+                    self.active_loops[mapping_id].set()
+                    del self.active_loops[mapping_id]
+                    return
+
+                # Иначе — запускаем новую
+                print(f"[LOOP] Start loop {mapping_id}")
                 stop_event = threading.Event()
                 self.active_loops[mapping_id] = stop_event
                 t = threading.Thread(target=self._run_loop, args=(resolved_keys, stop_event))
                 t.start()
-            else:
-                if mapping_id in self.active_loops:
-                    self.active_loops[mapping_id].set()
-                    del self.active_loops[mapping_id]
+
 
         elif mode == 'Toggle (Hold)':
             if is_note_on:
