@@ -160,7 +160,7 @@ def load_profile_data(filename):
         m_id = mapping.get('id')
         m_keys_str = mapping.get('keys', [])
         m_color = mapping.get('color', 0)
-        m_mode = mapping.get('mode', 'One-Shot') # Default mode
+        m_mode = mapping.get('mode', 'Common-KB') # Default mode
 
         # Парсинг клавиш для исполнителя макросов
         # Теперь мы сохраняем сырые строки для пауз ({WAIT:X}), а клавиши преобразуем
@@ -390,13 +390,33 @@ class MacroExecutor:
             return
 
         # --- MODES ---
+        if mode == "Common-KB":
+            if is_note_on:
+                # физическое удержание реальной клавиши
+                self.im.key_down(resolved_keys)
+
+                # можно добавить лёгкую подсветку GUI/HW
+                color = mapping_data.get("color", 15)
+                self.app.start_feedback(mapping_id, color_on="#009900")
+                self.app.start_hw_feedback(mapping_id, color)
+
+            else:  # note_off
+                self.im.key_up(resolved_keys)
+                self.app.stop_feedback(mapping_id)
+                self.app.stop_hw_feedback(mapping_id)
+
+            return
         if mode == 'One-Shot':
             if is_note_on:
                 threading.Thread(target=self._run_sequence, args=(resolved_keys,)).start()
                 self.app.start_feedback(mapping_id, color_on="#FF0000", color_off="#303030")
+                # HW flash
+                color = mapping_data.get("color", 15)
+                self.app.start_hw_feedback(mapping_id, color)
 
             else:
                 self.app.stop_feedback(mapping_id)
+                self.app.stop_hw_feedback(mapping_id)
 
         elif mode == 'Loop':
             # В режиме Loop мы игнорируем is_note_on=False (velocity=0)
@@ -420,6 +440,10 @@ class MacroExecutor:
                 # 🔥 запускаем мигающий фидбек
                 self.app.start_feedback(mapping_id)
 
+                # --- HW ---
+                color = mapping_data.get("color", 15)
+                self.app.start_hw_feedback(mapping_id, color)
+
 
         elif mode == 'Toggle (Hold)':
             if is_note_on:
@@ -429,11 +453,14 @@ class MacroExecutor:
                     self.active_toggles[mapping_id] = True
                     # 🔥 включаем фидбек
                     self.app.start_feedback(mapping_id)
+                    color = mapping_data.get("color", 15)
+                    self.app.start_hw_feedback(mapping_id, color)
                 else:
                     self.im.key_up([k for k in resolved_keys if isinstance(k, int)])
                     self.active_toggles[mapping_id] = False
                     # 🔥 выключаем
                     self.app.stop_feedback(mapping_id)
+                    self.app.stop_hw_feedback(mapping_id)
 
 
     def _run_sequence(self, keys):
@@ -831,7 +858,7 @@ class EditMappingWindow(ctk.CTkToplevel):
         row += 1
         ctk.CTkLabel(input_frame, text="Mode:", font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
         self.mode_var = ctk.StringVar(value=self.mapping_data.get('mode', 'One-Shot'))
-        ctk.CTkOptionMenu(input_frame, values=["One-Shot", "Loop", "Toggle (Hold)"], variable=self.mode_var).grid(row=row, column=1, sticky="w", padx=5)
+        ctk.CTkOptionMenu(input_frame, values=["Common-KB", "One-Shot", "Loop", "Toggle (Hold)"], variable=self.mode_var).grid(row=row, column=1, sticky="w", padx=5)
 
         row += 1
         ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_DESC'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
@@ -1013,6 +1040,10 @@ class App(ctk.CTk):
         # --- Active Feedback ---
         self.active_feedback = {}  # {mapping_id: {"state": bool, "color_on": "#00FF00", "color_off": "#303030"}}
         self.feedback_running = False
+
+        # --- HW Feedback ---
+        self.hw_feedback = {}       # {mapping_id: {"state": True/False, "color": int}}
+        self.hw_feedback_running = False
 
         try:
             MACRO_EXECUTOR.app = self
@@ -1199,7 +1230,7 @@ class App(ctk.CTk):
     def add_new_mapping(self):
         self.mappings_data.append({
             'type': 'note', 'id': 'NEW', 'keys_str': [],
-            'description': localization.get_string('MAPPING_NEW_DESC'), 'color': 3, 'mode': 'One-Shot'
+            'description': localization.get_string('MAPPING_NEW_DESC'), 'color': 3, 'mode': 'Common-KB'
         })
         self.open_edit_window(len(self.mappings_data) - 1)
 
@@ -1235,6 +1266,32 @@ class App(ctk.CTk):
             if m['type'] == m_type and str(m['id']) == str(m_id): return True
         return False
 
+    def stop_all_feedbacks(self):
+        """Останавливает все GUI и HW фидбеки (использовать при STOP/clear)."""
+        # Остановим GUI мигание
+        try:
+            self.active_feedback.clear()
+            self.feedback_running = False
+            if hasattr(self, "main_visualizer"):
+                self.main_visualizer.update_states(self.mappings_data)
+        except Exception as e:
+            print("[FEEDBACK] stop_all_feedbacks gui error:", e)
+
+        # Остановим HW мигание и восстановим цвета
+        try:
+            # делаем копию списка ключей чтобы безопасно итерировать
+            for mid in list(self.hw_feedback.keys()):
+                try:
+                    self.stop_hw_feedback(mid)
+                except Exception as e:
+                    print(f"[FEEDBACK] stop_hw_feedback error for {mid}: {e}")
+            # окончательно очистим словарь и флаг
+            self.hw_feedback.clear()
+            self.hw_feedback_running = False
+        except Exception as e:
+            print("[FEEDBACK] stop_all_feedbacks hw error:", e)
+
+
     def toggle_listener(self):
         if INPUT_MANAGER.init_error:
              self.update_status_label(f"❌ Cannot Start: {INPUT_MANAGER.init_error}", is_error=True)
@@ -1247,6 +1304,7 @@ class App(ctk.CTk):
         else:
             self.listener_thread.stop()
             self.clear_launchpad()
+            self.stop_all_feedbacks()
             self.toggle_btn.configure(text=localization.get_string('START_BTN'), fg_color="green")
 
     def clear_launchpad(self):
@@ -1335,6 +1393,103 @@ class App(ctk.CTk):
             del self.active_feedback[dead]
 
         self.after(500, self._feedback_tick)  # мигание 2 раза в секунду
+
+    def start_hw_feedback(self, mapping_id, color):
+        """Запускает мигание на физическом устройстве. Сохраняет оригинальный цвет для restore."""
+        # определяем restore_color — если mapping есть, берём безопасный цвет, иначе 0
+        try:
+            restore_color = 0
+            for m in self.mappings_data:
+                try:
+                    if int(m['id']) == int(mapping_id):
+                        restore_color = int(self.get_safe_color(m.get('color', 0)))
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            restore_color = 0
+
+        # сохраняем структуру: цвет для мигания + оригинал
+        self.hw_feedback[mapping_id] = {
+            "state": True,
+            "color": int(color),
+            "orig_color": int(restore_color)
+        }
+
+        if not self.hw_feedback_running:
+            self.hw_feedback_running = True
+            # запускаем тик (через after — безопаснее для Tk)
+            self._hw_feedback_tick()
+
+
+
+    def stop_hw_feedback(self, mapping_id):
+        """Останавливает мигание на Launchpad и восстанавливает цвет."""
+        try:
+            # Сначала попробуем прочитать сохранённый оригинал
+            orig = None
+            if mapping_id in self.hw_feedback:
+                orig = self.hw_feedback[mapping_id].get("orig_color")
+
+            # удаляем запись (чтобы не мигать больше)
+            if mapping_id in self.hw_feedback:
+                del self.hw_feedback[mapping_id]
+
+            # если больше нет записей -- выключаем флаг
+            if not self.hw_feedback:
+                self.hw_feedback_running = False
+
+            # восстанавливаем цвет жестко (используем orig если есть, иначе ищем в mappings)
+            restore_color = None
+            if orig is not None:
+                restore_color = int(orig)
+            else:
+                for m in self.mappings_data:
+                    try:
+                        if int(m["id"]) == int(mapping_id):
+                            restore_color = int(self.get_safe_color(m.get("color", 0)))
+                            break
+                    except Exception:
+                        pass
+            if restore_color is None:
+                restore_color = 0
+
+            # Отправляем сразу восстановление (тонкий/быстрый)
+            if self.midi_output:
+                try:
+                    self.midi_output.send(Message("note_on", note=int(mapping_id), velocity=int(restore_color)))
+                except Exception as e:
+                    print("[HW-FEEDBACK] restore error:", e)
+
+        except Exception as e:
+            print("[HW-FEEDBACK] stop_hw_feedback exception:", e)
+
+
+
+    def _hw_feedback_tick(self):
+        """Периодическое мигание ~2Hz."""
+        if not self.hw_feedback_running:
+            return
+
+        if not self.hw_feedback:
+            # ничего мигать — выключаем флаг и выйдем
+            self.hw_feedback_running = False
+            return
+
+        for mapping_id, data in list(self.hw_feedback.items()):
+            data["state"] = not data["state"]
+            velocity = data["color"] if data["state"] else 0
+            try:
+                if self.midi_output:
+                    self.midi_output.send(Message('note_on', note=int(mapping_id), velocity=int(velocity)))
+            except Exception as e:
+                print("[HW-FEEDBACK] MIDI error:", e)
+
+        # schedule next tick only if still running
+        if self.hw_feedback_running and self.hw_feedback:
+            self.after(500, self._hw_feedback_tick)
+        else:
+            self.hw_feedback_running = False
 
 
 if __name__ == "__main__":
