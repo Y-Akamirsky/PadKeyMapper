@@ -181,6 +181,7 @@ imports:
  &#8226;   <a href="#enum">enum</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#genericpath">genericpath</a>
+ &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#heapq">heapq</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#json">json</a>
@@ -5736,41 +5737,33 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>distutils</tt></a>
 <span class="moduletype">AliasNode</span>  <div class="import">
 imports:
-    <a href="#distutils.archive_util">distutils.archive_util</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.file_util">distutils.file_util</a>
- &#8226;   <a href="#distutils.sysconfig">distutils.sysconfig</a>
- &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
+    <a href="#setuptools._distutils">setuptools._distutils</a>
+ &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils._log">distutils._log</a>
- &#8226;   <a href="#distutils._modified">distutils._modified</a>
- &#8226;   <a href="#distutils.cmd">distutils.cmd</a>
- &#8226;   <a href="#distutils.command">distutils.command</a>
- &#8226;   <a href="#distutils.core">distutils.core</a>
- &#8226;   <a href="#distutils.debug">distutils.debug</a>
- &#8226;   <a href="#distutils.dir_util">distutils.dir_util</a>
- &#8226;   <a href="#distutils.dist">distutils.dist</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.extension">distutils.extension</a>
- &#8226;   <a href="#distutils.fancy_getopt">distutils.fancy_getopt</a>
- &#8226;   <a href="#distutils.filelist">distutils.filelist</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#distutils.spawn">distutils.spawn</a>
- &#8226;   <a href="#distutils.sysconfig">distutils.sysconfig</a>
- &#8226;   <a href="#distutils.text_file">distutils.text_file</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
- &#8226;   <a href="#distutils.versionpredicate">distutils.versionpredicate</a>
- &#8226;   <a href="#main.py">main.py</a>
+    <a href="#main.py">main.py</a>
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
+ &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
+ &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+ &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
+ &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
+ &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
+ &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
+ &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
+ &#8226;   <a href="#setuptools._distutils.text_file">setuptools._distutils.text_file</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
+ &#8226;   <a href="#setuptools._distutils.versionpredicate">setuptools._distutils.versionpredicate</a>
  &#8226;   <a href="#setuptools._shutil">setuptools._shutil</a>
  &#8226;   <a href="#setuptools.command.bdist_egg">setuptools.command.bdist_egg</a>
  &#8226;   <a href="#setuptools.command.bdist_wheel">setuptools.command.bdist_wheel</a>
@@ -5781,391 +5774,6 @@ imported by:
  &#8226;   <a href="#setuptools.errors">setuptools.errors</a>
  &#8226;   <a href="#setuptools.installer">setuptools.installer</a>
  &#8226;   <a href="#setuptools.wheel">setuptools.wheel</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils._log"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils._log</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils._modified"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils._modified</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.archive_util"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.archive_util</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.cmd"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.cmd</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.command"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.command</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
- &#8226;   <a href="#setuptools._distutils.command.build">setuptools._distutils.command.build</a>
- &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
- &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.core"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.core</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools">setuptools</a>
- &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
- &#8226;   <a href="#setuptools.extension">setuptools.extension</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.debug"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.debug</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
- &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
- &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.dir_util"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.dir_util</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
- &#8226;   <a href="#setuptools.command.bdist_egg">setuptools.command.bdist_egg</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.dist"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.dist</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
- &#8226;   <a href="#setuptools.config._apply_pyprojecttoml">setuptools.config._apply_pyprojecttoml</a>
- &#8226;   <a href="#setuptools.config.setupcfg">setuptools.config.setupcfg</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.errors"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.errors</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools.archive_util">setuptools.archive_util</a>
- &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
- &#8226;   <a href="#setuptools.command.setopt">setuptools.command.setopt</a>
- &#8226;   <a href="#setuptools.config.expand">setuptools.config.expand</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
- &#8226;   <a href="#setuptools.errors">setuptools.errors</a>
- &#8226;   <a href="#setuptools.extension">setuptools.extension</a>
- &#8226;   <a href="#setuptools.installer">setuptools.installer</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.extension"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.extension</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools.extension">setuptools.extension</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.fancy_getopt"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.fancy_getopt</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
- &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.file_util"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.file_util</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.filelist"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.filelist</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
- &#8226;   <a href="#setuptools.monkey">setuptools.monkey</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.log"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.log</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._shutil">setuptools._shutil</a>
- &#8226;   <a href="#setuptools.command.bdist_egg">setuptools.command.bdist_egg</a>
- &#8226;   <a href="#setuptools.command.bdist_wheel">setuptools.command.bdist_wheel</a>
- &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
- &#8226;   <a href="#setuptools.command.sdist">setuptools.command.sdist</a>
- &#8226;   <a href="#setuptools.command.setopt">setuptools.command.setopt</a>
- &#8226;   <a href="#setuptools.discovery">setuptools.discovery</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
- &#8226;   <a href="#setuptools.installer">setuptools.installer</a>
- &#8226;   <a href="#setuptools.logging">setuptools.logging</a>
- &#8226;   <a href="#setuptools.wheel">setuptools.wheel</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.spawn"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.spawn</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.sysconfig"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.sysconfig</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
- &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.text_file"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.text_file</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.text_file">setuptools._distutils.text_file</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
- &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.util"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.util</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
- &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
- &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
- &#8226;   <a href="#setuptools.command.setopt">setuptools.command.setopt</a>
- &#8226;   <a href="#setuptools.discovery">setuptools.discovery</a>
- &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
- &#8226;   <a href="#setuptools.wheel">setuptools.wheel</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="distutils.versionpredicate"></a>
-  <a target="code" href="" type="text/plain"><tt>distutils.versionpredicate</tt></a>
-<span class="moduletype">AliasNode</span>  <div class="import">
-imports:
-    <a href="#distutils">distutils</a>
- &#8226;   <a href="#setuptools._distutils.versionpredicate">setuptools._distutils.versionpredicate</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
 
   </div>
 
@@ -9554,7 +9162,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#pathlib._abc">pathlib._abc</a>
+    <a href="#main.py">main.py</a>
+ &#8226;   <a href="#pathlib._abc">pathlib._abc</a>
  &#8226;   <a href="#pathlib._local">pathlib._local</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
  &#8226;   <a href="#setuptools._vendor.wheel.cli.convert">setuptools._vendor.wheel.cli.convert</a>
@@ -13045,6 +12654,7 @@ imports:
     <a href="#packaging">packaging</a>
  &#8226;   <a href="#packaging._manylinux">packaging._manylinux</a>
  &#8226;   <a href="#packaging._musllinux">packaging._musllinux</a>
+ &#8226;   <a href="#packaging.version">packaging.version</a>
 
   </div>
   <div class="import">
@@ -13418,6 +13028,7 @@ imported by:
  &#8226;   <a href="#customtkinter.windows.ctk_toplevel">customtkinter.windows.ctk_toplevel</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#mido.version">mido.version</a>
+ &#8226;   <a href="#packaging">packaging</a>
  &#8226;   <a href="#packaging.specifiers">packaging.specifiers</a>
  &#8226;   <a href="#packaging.utils">packaging.utils</a>
  &#8226;   <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
@@ -14414,12 +14025,12 @@ imports:
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#_distutils_hack.override">_distutils_hack.override</a>
  &#8226;   <a href="#abc">abc</a>
- &#8226;   <a href="#distutils.core">distutils.core</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools">setuptools</a>
  &#8226;   <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
+ &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
  &#8226;   <a href="#setuptools._entry_points">setuptools._entry_points</a>
  &#8226;   <a href="#setuptools._imp">setuptools._imp</a>
  &#8226;   <a href="#setuptools._normalization">setuptools._normalization</a>
@@ -14496,7 +14107,6 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
  &#8226;   <a href="#email">email</a>
  &#8226;   <a href="#email.message">email.message</a>
  &#8226;   <a href="#os">os</a>
@@ -14505,6 +14115,7 @@ imports:
  &#8226;   <a href="#packaging.utils">packaging.utils</a>
  &#8226;   <a href="#packaging.version">packaging.version</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools._normalization">setuptools._normalization</a>
  &#8226;   <a href="#setuptools._reqs">setuptools._reqs</a>
  &#8226;   <a href="#setuptools._static">setuptools._static</a>
@@ -14579,7 +14190,6 @@ imported by:
  &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
  &#8226;   <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
  &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
- &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
  &#8226;   <a href="#setuptools._distutils.text_file">setuptools._distutils.text_file</a>
@@ -14603,10 +14213,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils._log">distutils._log</a>
- &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
+    <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
+ &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.msvc">setuptools._distutils.compilers.C.msvc</a>
  &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
@@ -14628,6 +14238,7 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#os.path">os.path</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
@@ -14639,10 +14250,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils._modified">distutils._modified</a>
- &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
+ &#8226;   <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
 
   </div>
@@ -14689,8 +14300,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.archive_util">distutils.archive_util</a>
- &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
+    <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
 
@@ -14728,10 +14338,7 @@ imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#abc">abc</a>
- &#8226;   <a href="#distutils.debug">distutils.debug</a>
- &#8226;   <a href="#distutils.dist">distutils.dist</a>
- &#8226;   <a href="#distutils.fancy_getopt">distutils.fancy_getopt</a>
- &#8226;   <a href="#distutils.spawn">distutils.spawn</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#re">re</a>
@@ -14739,20 +14346,26 @@ imports:
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
  &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
  &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
+ &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
  &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
  &#8226;   <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
+ &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeVarTuple">typing_extensions.TypeVarTuple</a>
+ &#8226;   <a href="#typing_extensions.Unpack">typing_extensions.Unpack</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.cmd">distutils.cmd</a>
- &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+    <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
 
   </div>
 
@@ -14769,9 +14382,13 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.command">distutils.command</a>
+    <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
+ &#8226;   <a href="#setuptools._distutils.command.build">setuptools._distutils.command.build</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
  &#8226;   <a href="#setuptools._distutils.command.check">setuptools._distutils.command.check</a>
+ &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
 
   </div>
 
@@ -14784,14 +14401,15 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.command">distutils.command</a>
  &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
  &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.deprecated">typing_extensions.deprecated</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
@@ -14810,9 +14428,9 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.command">distutils.command</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools._distutils.ccompiler">setuptools._distutils.ccompiler</a>
+ &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
  &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
@@ -14892,18 +14510,17 @@ imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils._log">distutils._log</a>
- &#8226;   <a href="#distutils.archive_util">distutils.archive_util</a>
- &#8226;   <a href="#distutils.command">distutils.command</a>
- &#8226;   <a href="#distutils.dir_util">distutils.dir_util</a>
- &#8226;   <a href="#distutils.file_util">distutils.file_util</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#itertools">itertools</a>
  &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
  &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
+ &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
  &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+ &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
+ &#8226;   <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
  &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
  &#8226;   <a href="#setuptools._distutils.text_file">setuptools._distutils.text_file</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
@@ -15025,8 +14642,6 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.debug">distutils.debug</a>
- &#8226;   <a href="#distutils.fancy_getopt">distutils.fancy_getopt</a>
  &#8226;   <a href="#more_itertools">more_itertools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#pathlib">pathlib</a>
@@ -15035,8 +14650,10 @@ imports:
  &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C">setuptools._distutils.compilers.C</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.errors">setuptools._distutils.compilers.C.errors</a>
+ &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
  &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
  &#8226;   <a href="#setuptools._distutils.file_util">setuptools._distutils.file_util</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
@@ -15044,6 +14661,9 @@ imports:
  &#8226;   <a href="#tempfile">tempfile</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
+ &#8226;   <a href="#typing_extensions.TypeVarTuple">typing_extensions.TypeVarTuple</a>
+ &#8226;   <a href="#typing_extensions.Unpack">typing_extensions.Unpack</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
@@ -15114,6 +14734,7 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
@@ -15127,12 +14748,15 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.core">distutils.core</a>
+    <a href="#setuptools">setuptools</a>
  &#8226;   <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
  &#8226;   <a href="#setuptools._distutils.command.build">setuptools._distutils.command.build</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
  &#8226;   <a href="#setuptools._distutils.command.check">setuptools._distutils.command.check</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
+ &#8226;   <a href="#setuptools.extension">setuptools.extension</a>
 
   </div>
 
@@ -15143,16 +14767,20 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/_distutils/debug.py" type="text/plain"><tt>setuptools._distutils.debug</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#os">os</a>
+    <a href="#distutils">distutils</a>
+ &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.debug">distutils.debug</a>
+    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
 
   </div>
 
@@ -15163,7 +14791,8 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/_distutils/dir_util.py" type="text/plain"><tt>setuptools._distutils.dir_util</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#functools">functools</a>
+    <a href="#distutils">distutils</a>
+ &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#itertools">itertools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#pathlib">pathlib</a>
@@ -15175,10 +14804,11 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.dir_util">distutils.dir_util</a>
- &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
+    <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
+ &#8226;   <a href="#setuptools.command.bdist_egg">setuptools.command.bdist_egg</a>
 
   </div>
 
@@ -15194,10 +14824,7 @@ imports:
  &#8226;   <a href="#_typeshed">_typeshed</a>
  &#8226;   <a href="#configparser">configparser</a>
  &#8226;   <a href="#contextlib">contextlib</a>
- &#8226;   <a href="#distutils.cmd">distutils.cmd</a>
- &#8226;   <a href="#distutils.command">distutils.command</a>
- &#8226;   <a href="#distutils.core">distutils.core</a>
- &#8226;   <a href="#distutils.versionpredicate">distutils.versionpredicate</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#email">email</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#os">os</a>
@@ -15208,20 +14835,27 @@ imports:
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
+ &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
  &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
+ &#8226;   <a href="#setuptools._distutils.versionpredicate">setuptools._distutils.versionpredicate</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.dist">distutils.dist</a>
+    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+ &#8226;   <a href="#setuptools.config._apply_pyprojecttoml">setuptools.config._apply_pyprojecttoml</a>
+ &#8226;   <a href="#setuptools.config.setupcfg">setuptools.config.setupcfg</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
 
   </div>
 
@@ -15239,8 +14873,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
+    <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
  &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
@@ -15259,6 +14892,14 @@ imported by:
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
+ &#8226;   <a href="#setuptools.archive_util">setuptools.archive_util</a>
+ &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
+ &#8226;   <a href="#setuptools.command.setopt">setuptools.command.setopt</a>
+ &#8226;   <a href="#setuptools.config.expand">setuptools.config.expand</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
+ &#8226;   <a href="#setuptools.errors">setuptools.errors</a>
+ &#8226;   <a href="#setuptools.extension">setuptools.extension</a>
+ &#8226;   <a href="#setuptools.installer">setuptools.installer</a>
  &#8226;   <a href="#setuptools.msvc">setuptools.msvc</a>
 
   </div>
@@ -15272,19 +14913,20 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.sysconfig">distutils.sysconfig</a>
- &#8226;   <a href="#distutils.text_file">distutils.text_file</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
+ &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
+ &#8226;   <a href="#setuptools._distutils.text_file">setuptools._distutils.text_file</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.extension">distutils.extension</a>
- &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
+    <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
  &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+ &#8226;   <a href="#setuptools.extension">setuptools.extension</a>
 
   </div>
 
@@ -15297,6 +14939,7 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#getopt">getopt</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
@@ -15308,10 +14951,12 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.fancy_getopt">distutils.fancy_getopt</a>
+    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
 
   </div>
 
@@ -15322,21 +14967,21 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/_distutils/file_util.py" type="text/plain"><tt>setuptools._distutils.file_util</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#distutils._modified">distutils._modified</a>
- &#8226;   <a href="#errno">errno</a>
+    <a href="#errno">errno</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#os.path">os.path</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
+ &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#stat">stat</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.file_util">distutils.file_util</a>
- &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
+    <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
 
@@ -15351,13 +14996,14 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.debug">distutils.debug</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#fnmatch">fnmatch</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
+ &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#typing">typing</a>
@@ -15365,8 +15011,9 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.filelist">distutils.filelist</a>
- &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+    <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
+ &#8226;   <a href="#setuptools.monkey">setuptools.monkey</a>
 
   </div>
 
@@ -15377,15 +15024,25 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/_distutils/log.py" type="text/plain"><tt>setuptools._distutils.log</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#logging">logging</a>
- &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
+    <a href="#distutils">distutils</a>
+ &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.log">distutils.log</a>
+    <a href="#setuptools._shutil">setuptools._shutil</a>
+ &#8226;   <a href="#setuptools.command.bdist_egg">setuptools.command.bdist_egg</a>
+ &#8226;   <a href="#setuptools.command.bdist_wheel">setuptools.command.bdist_wheel</a>
+ &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
+ &#8226;   <a href="#setuptools.command.sdist">setuptools.command.sdist</a>
+ &#8226;   <a href="#setuptools.command.setopt">setuptools.command.setopt</a>
+ &#8226;   <a href="#setuptools.discovery">setuptools.discovery</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
+ &#8226;   <a href="#setuptools.installer">setuptools.installer</a>
+ &#8226;   <a href="#setuptools.logging">setuptools.logging</a>
+ &#8226;   <a href="#setuptools.wheel">setuptools.wheel</a>
 
   </div>
 
@@ -15398,6 +15055,7 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#distutils">distutils</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#platform">platform</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
@@ -15414,8 +15072,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.spawn">distutils.spawn</a>
- &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
+    <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
+ &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
 
@@ -15430,7 +15088,6 @@ imported by:
 imports:
     <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.text_file">distutils.text_file</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#pathlib">pathlib</a>
@@ -15440,19 +15097,23 @@ imports:
  &#8226;   <a href="#setuptools._distutils.compat">setuptools._distutils.compat</a>
  &#8226;   <a href="#setuptools._distutils.compat.py39">setuptools._distutils.compat.py39</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.text_file">setuptools._distutils.text_file</a>
  &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools._vendor.jaraco.functools">setuptools._vendor.jaraco.functools</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#sysconfig">sysconfig</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.deprecated">typing_extensions.deprecated</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.sysconfig">distutils.sysconfig</a>
+    <a href="#distutils">distutils</a>
  &#8226;   <a href="#setuptools._distutils.command.build_ext">setuptools._distutils.command.build_ext</a>
+ &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#uinput">uinput</a>
 
   </div>
@@ -15464,14 +15125,16 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/_distutils/text_file.py" type="text/plain"><tt>setuptools._distutils.text_file</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#setuptools._distutils">setuptools._distutils</a>
+    <a href="#distutils">distutils</a>
+ &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#sys">sys</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.text_file">distutils.text_file</a>
- &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+    <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
+ &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
 
   </div>
 
@@ -15485,7 +15148,6 @@ imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.sysconfig">distutils.sysconfig</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
  &#8226;   <a href="#os">os</a>
@@ -15498,6 +15160,7 @@ imports:
  &#8226;   <a href="#setuptools._distutils._modified">setuptools._distutils._modified</a>
  &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
+ &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
  &#8226;   <a href="#setuptools._vendor.jaraco.functools">setuptools._vendor.jaraco.functools</a>
  &#8226;   <a href="#string">string</a>
  &#8226;   <a href="#subprocess">subprocess</a>
@@ -15506,12 +15169,15 @@ imports:
  &#8226;   <a href="#tempfile">tempfile</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeVarTuple">typing_extensions.TypeVarTuple</a>
+ &#8226;   <a href="#typing_extensions.Unpack">typing_extensions.Unpack</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
   <div class="import">
 imported by:
     <a href="#distutils.util">distutils.util</a>
+ &#8226;   <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
  &#8226;   <a href="#setuptools._distutils.command.build">setuptools._distutils.command.build</a>
@@ -15520,9 +15186,15 @@ imported by:
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.msvc">setuptools._distutils.compilers.C.msvc</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
  &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
+ &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
+ &#8226;   <a href="#setuptools.command.setopt">setuptools.command.setopt</a>
+ &#8226;   <a href="#setuptools.discovery">setuptools.discovery</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
+ &#8226;   <a href="#setuptools.wheel">setuptools.wheel</a>
 
   </div>
 
@@ -15553,7 +15225,8 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/_distutils/versionpredicate.py" type="text/plain"><tt>setuptools._distutils.versionpredicate</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#operator">operator</a>
+    <a href="#distutils">distutils</a>
+ &#8226;   <a href="#operator">operator</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools._distutils">setuptools._distutils</a>
  &#8226;   <a href="#setuptools._distutils.version">setuptools._distutils.version</a>
@@ -15561,7 +15234,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#distutils.versionpredicate">distutils.versionpredicate</a>
+    <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
 
   </div>
 
@@ -15696,6 +15369,7 @@ imports:
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
 
   </div>
   <div class="import">
@@ -15727,6 +15401,7 @@ imports:
  &#8226;   <a href="#setuptools._vendor.jaraco.text">setuptools._vendor.jaraco.text</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
 
   </div>
   <div class="import">
@@ -15747,9 +15422,9 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools.compat">setuptools.compat</a>
  &#8226;   <a href="#setuptools.compat.py311">setuptools.compat.py311</a>
  &#8226;   <a href="#stat">stat</a>
@@ -17311,6 +16986,7 @@ imports:
  &#8226;   <a href="#time">time</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.Buffer">typing_extensions.Buffer</a>
  &#8226;   <a href="#wheel">wheel</a>
  &#8226;   <a href="#zipfile">zipfile</a>
 
@@ -17414,10 +17090,10 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#contextlib">contextlib</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#posixpath">posixpath</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#shutil">shutil</a>
  &#8226;   <a href="#tarfile">tarfile</a>
@@ -17496,12 +17172,12 @@ imported by:
 imports:
     <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.dir_util">distutils.dir_util</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
  &#8226;   <a href="#marshal">marshal</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#setuptools.command">setuptools.command</a>
  &#8226;   <a href="#setuptools.extension">setuptools.extension</a>
@@ -17511,6 +17187,7 @@ imports:
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
  &#8226;   <a href="#zipfile">zipfile</a>
 
   </div>
@@ -17531,7 +17208,6 @@ imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
  &#8226;   <a href="#email.generator">email.generator</a>
  &#8226;   <a href="#email.message">email.message</a>
  &#8226;   <a href="#glob">glob</a>
@@ -17542,6 +17218,7 @@ imports:
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools">setuptools</a>
  &#8226;   <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools._normalization">setuptools._normalization</a>
  &#8226;   <a href="#setuptools._shutil">setuptools._shutil</a>
  &#8226;   <a href="#setuptools._vendor.wheel.macosx_libfile">setuptools._vendor.wheel.macosx_libfile</a>
@@ -17593,10 +17270,6 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.filelist">distutils.filelist</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#packaging">packaging</a>
@@ -17604,6 +17277,10 @@ imports:
  &#8226;   <a href="#packaging.version">packaging.version</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools._entry_points">setuptools._entry_points</a>
  &#8226;   <a href="#setuptools._importlib">setuptools._importlib</a>
  &#8226;   <a href="#setuptools._normalization">setuptools._normalization</a>
@@ -17636,11 +17313,11 @@ imports:
     <a href="#__future__">__future__</a>
  &#8226;   <a href="#contextlib">contextlib</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
  &#8226;   <a href="#itertools">itertools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools._importlib">setuptools._importlib</a>
  &#8226;   <a href="#setuptools.command">setuptools.command</a>
  &#8226;   <a href="#setuptools.command.build">setuptools.command.build</a>
@@ -17663,11 +17340,11 @@ imported by:
 imports:
     <a href="#configparser">configparser</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools.command">setuptools.command</a>
  &#8226;   <a href="#setuptools.unicode_utils">setuptools.unicode_utils</a>
 
@@ -17733,6 +17410,7 @@ imports:
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
 
   </div>
   <div class="import">
@@ -17799,7 +17477,6 @@ imported by:
 imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.dist">distutils.dist</a>
  &#8226;   <a href="#email.headerregistry">email.headerregistry</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#inspect">inspect</a>
@@ -17807,6 +17484,7 @@ imports:
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
  &#8226;   <a href="#setuptools._importlib">setuptools._importlib</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#setuptools._static">setuptools._static</a>
@@ -17819,6 +17497,7 @@ imports:
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
 
   </div>
   <div class="import">
@@ -17877,6 +17556,7 @@ imports:
  &#8226;   <a href="#textwrap">textwrap</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.Self">typing_extensions.Self</a>
 
   </div>
   <div class="import">
@@ -17967,6 +17647,7 @@ imports:
  &#8226;   <a href="#trove_classifiers">trove_classifiers</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.Literal">typing_extensions.Literal</a>
  &#8226;   <a href="#urllib.parse">urllib.parse</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
 
@@ -17988,7 +17669,6 @@ imports:
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#ast">ast</a>
  &#8226;   <a href="#configparser">configparser</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
@@ -17997,6 +17677,7 @@ imports:
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#setuptools._static">setuptools._static</a>
  &#8226;   <a href="#setuptools.config">setuptools.config</a>
@@ -18007,6 +17688,7 @@ imports:
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.Self">typing_extensions.Self</a>
 
   </div>
   <div class="import">
@@ -18044,6 +17726,7 @@ imports:
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.Self">typing_extensions.Self</a>
 
   </div>
   <div class="import">
@@ -18064,13 +17747,13 @@ imports:
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#collections">collections</a>
  &#8226;   <a href="#contextlib">contextlib</a>
- &#8226;   <a href="#distutils.dist">distutils.dist</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#packaging.markers">packaging.markers</a>
  &#8226;   <a href="#packaging.requirements">packaging.requirements</a>
  &#8226;   <a href="#packaging.version">packaging.version</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#setuptools._static">setuptools._static</a>
  &#8226;   <a href="#setuptools.config">setuptools.config</a>
@@ -18080,6 +17763,7 @@ imports:
  &#8226;   <a href="#setuptools.warnings">setuptools.warnings</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
 
   </div>
   <div class="import">
@@ -18125,8 +17809,6 @@ imports:
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#_distutils_hack.override">_distutils_hack.override</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
  &#8226;   <a href="#fnmatch">fnmatch</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#inspect">inspect</a>
@@ -18134,6 +17816,8 @@ imports:
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#setuptools.errors">setuptools.errors</a>
  &#8226;   <a href="#typing">typing</a>
@@ -18157,15 +17841,6 @@ imports:
     <a href="#'collections.abc'">'collections.abc'</a>
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#configparser">configparser</a>
- &#8226;   <a href="#distutils.cmd">distutils.cmd</a>
- &#8226;   <a href="#distutils.command">distutils.command</a>
- &#8226;   <a href="#distutils.core">distutils.core</a>
- &#8226;   <a href="#distutils.debug">distutils.debug</a>
- &#8226;   <a href="#distutils.dist">distutils.dist</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.fancy_getopt">distutils.fancy_getopt</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#io">io</a>
@@ -18179,6 +17854,15 @@ imports:
  &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.command">setuptools._distutils.command</a>
+ &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+ &#8226;   <a href="#setuptools._distutils.debug">setuptools._distutils.debug</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.fancy_getopt">setuptools._distutils.fancy_getopt</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools._entry_points">setuptools._entry_points</a>
  &#8226;   <a href="#setuptools._importlib">setuptools._importlib</a>
  &#8226;   <a href="#setuptools._normalization">setuptools._normalization</a>
@@ -18200,6 +17884,7 @@ imports:
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
 
   </div>
   <div class="import">
@@ -18223,8 +17908,8 @@ imported by:
 imports:
     <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
 
   </div>
   <div class="import">
@@ -18246,12 +17931,12 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.core">distutils.core</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.extension">distutils.extension</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.core">setuptools._distutils.core</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.extension">setuptools._distutils.extension</a>
  &#8226;   <a href="#setuptools._path">setuptools._path</a>
  &#8226;   <a href="#setuptools.monkey">setuptools.monkey</a>
  &#8226;   <a href="#typing">typing</a>
@@ -18297,14 +17982,14 @@ imported by:
 imports:
     <a href="#__future__">__future__</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.errors">distutils.errors</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#itertools">itertools</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#packaging.requirements">packaging.requirements</a>
  &#8226;   <a href="#packaging.utils">packaging.utils</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.errors">setuptools._distutils.errors</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools._importlib">setuptools._importlib</a>
  &#8226;   <a href="#setuptools._reqs">setuptools._reqs</a>
  &#8226;   <a href="#setuptools.warnings">setuptools.warnings</a>
@@ -18327,10 +18012,10 @@ imported by:
   <a target="code" href="/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/setuptools/logging.py" type="text/plain"><tt>setuptools.logging</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#inspect">inspect</a>
+    <a href="#inspect">inspect</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#setuptools">setuptools</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
  &#8226;   <a href="#setuptools.monkey">setuptools.monkey</a>
  &#8226;   <a href="#sys">sys</a>
 
@@ -18349,11 +18034,11 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#__future__">__future__</a>
- &#8226;   <a href="#distutils.filelist">distutils.filelist</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#platform">platform</a>
  &#8226;   <a href="#setuptools">setuptools</a>
  &#8226;   <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
+ &#8226;   <a href="#setuptools._distutils.filelist">setuptools._distutils.filelist</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#typing">typing</a>
@@ -18452,6 +18137,7 @@ imports:
  &#8226;   <a href="#textwrap">textwrap</a>
  &#8226;   <a href="#typing">typing</a>
  &#8226;   <a href="#typing_extensions">typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
@@ -18482,8 +18168,6 @@ imported by:
 imports:
     <a href="#contextlib">contextlib</a>
  &#8226;   <a href="#distutils">distutils</a>
- &#8226;   <a href="#distutils.log">distutils.log</a>
- &#8226;   <a href="#distutils.util">distutils.util</a>
  &#8226;   <a href="#email">email</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#itertools">itertools</a>
@@ -18496,6 +18180,8 @@ imports:
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#setuptools">setuptools</a>
  &#8226;   <a href="#setuptools._discovery">setuptools._discovery</a>
+ &#8226;   <a href="#setuptools._distutils.log">setuptools._distutils.log</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
  &#8226;   <a href="#setuptools._importlib">setuptools._importlib</a>
  &#8226;   <a href="#setuptools.archive_util">setuptools.archive_util</a>
  &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
@@ -20264,6 +19950,13 @@ imported by:
 <span class="moduletype">AliasNode</span>  <div class="import">
 imports:
     <a href="#setuptools._vendor.typing_extensions">setuptools._vendor.typing_extensions</a>
+ &#8226;   <a href="#typing_extensions.Buffer">typing_extensions.Buffer</a>
+ &#8226;   <a href="#typing_extensions.Literal">typing_extensions.Literal</a>
+ &#8226;   <a href="#typing_extensions.Self">typing_extensions.Self</a>
+ &#8226;   <a href="#typing_extensions.TypeAlias">typing_extensions.TypeAlias</a>
+ &#8226;   <a href="#typing_extensions.TypeVarTuple">typing_extensions.TypeVarTuple</a>
+ &#8226;   <a href="#typing_extensions.Unpack">typing_extensions.Unpack</a>
+ &#8226;   <a href="#typing_extensions.deprecated">typing_extensions.deprecated</a>
 
   </div>
   <div class="import">
@@ -20294,6 +19987,106 @@ imported by:
  &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
  &#8226;   <a href="#setuptools.msvc">setuptools.msvc</a>
  &#8226;   <a href="#setuptools.warnings">setuptools.warnings</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.Buffer"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.Buffer</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools._vendor.wheel.wheelfile">setuptools._vendor.wheel.wheelfile</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.Literal"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.Literal</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools.config._validate_pyproject.formats">setuptools.config._validate_pyproject.formats</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.Self"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.Self</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools.config._validate_pyproject.error_reporting">setuptools.config._validate_pyproject.error_reporting</a>
+ &#8226;   <a href="#setuptools.config.expand">setuptools.config.expand</a>
+ &#8226;   <a href="#setuptools.config.pyprojecttoml">setuptools.config.pyprojecttoml</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.TypeAlias"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.TypeAlias</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
+ &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
+ &#8226;   <a href="#setuptools._path">setuptools._path</a>
+ &#8226;   <a href="#setuptools._reqs">setuptools._reqs</a>
+ &#8226;   <a href="#setuptools.command.bdist_egg">setuptools.command.bdist_egg</a>
+ &#8226;   <a href="#setuptools.compat.py311">setuptools.compat.py311</a>
+ &#8226;   <a href="#setuptools.config._apply_pyprojecttoml">setuptools.config._apply_pyprojecttoml</a>
+ &#8226;   <a href="#setuptools.config.setupcfg">setuptools.config.setupcfg</a>
+ &#8226;   <a href="#setuptools.dist">setuptools.dist</a>
+ &#8226;   <a href="#setuptools.warnings">setuptools.warnings</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.TypeVarTuple"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.TypeVarTuple</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.Unpack"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.Unpack</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
+ &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
+ &#8226;   <a href="#setuptools._distutils.util">setuptools._distutils.util</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="typing_extensions.deprecated"></a>
+  <a target="code" href="" type="text/plain"><tt>typing_extensions.deprecated</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#setuptools._distutils.command.bdist">setuptools._distutils.command.bdist</a>
+ &#8226;   <a href="#setuptools._distutils.sysconfig">setuptools._distutils.sysconfig</a>
+ &#8226;   <a href="#typing_extensions">typing_extensions</a>
 
   </div>
 

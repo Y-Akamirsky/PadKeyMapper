@@ -393,6 +393,10 @@ class MacroExecutor:
         if mode == 'One-Shot':
             if is_note_on:
                 threading.Thread(target=self._run_sequence, args=(resolved_keys,)).start()
+                self.app.start_feedback(mapping_id, color_on="#FF0000", color_off="#303030")
+
+            else:
+                self.app.stop_feedback(mapping_id)
 
         elif mode == 'Loop':
             # В режиме Loop мы игнорируем is_note_on=False (velocity=0)
@@ -403,6 +407,7 @@ class MacroExecutor:
                     print(f"[LOOP] Stop loop {mapping_id}")
                     self.active_loops[mapping_id].set()
                     del self.active_loops[mapping_id]
+                    self.app.stop_feedback(mapping_id)
                     return
 
                 # Иначе — запускаем новую
@@ -412,6 +417,9 @@ class MacroExecutor:
                 t = threading.Thread(target=self._run_loop, args=(resolved_keys, stop_event))
                 t.start()
 
+                # 🔥 запускаем мигающий фидбек
+                self.app.start_feedback(mapping_id)
+
 
         elif mode == 'Toggle (Hold)':
             if is_note_on:
@@ -419,9 +427,13 @@ class MacroExecutor:
                 if not held:
                     self.im.key_down([k for k in resolved_keys if isinstance(k, int)])
                     self.active_toggles[mapping_id] = True
+                    # 🔥 включаем фидбек
+                    self.app.start_feedback(mapping_id)
                 else:
                     self.im.key_up([k for k in resolved_keys if isinstance(k, int)])
                     self.active_toggles[mapping_id] = False
+                    # 🔥 выключаем
+                    self.app.stop_feedback(mapping_id)
 
 
     def _run_sequence(self, keys):
@@ -700,6 +712,12 @@ class VirtualPadVisualizer(ctk.CTkFrame):
             except: pass
             if (cs_type, cs_id) in self.buttons:
                 self.buttons[(cs_type, cs_id)].configure(fg_color="red")
+
+    def get_button_by_id(self, mapping_id):
+        for (tp, mid), btn in self.buttons.items():
+            if str(mid) == str(mapping_id):
+                return btn
+        return None
 
 class KeySelectionWindow(ctk.CTkToplevel):
     def __init__(self, master, target_entry):
@@ -992,6 +1010,16 @@ class App(ctk.CTk):
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+        # --- Active Feedback ---
+        self.active_feedback = {}  # {mapping_id: {"state": bool, "color_on": "#00FF00", "color_off": "#303030"}}
+        self.feedback_running = False
+
+        try:
+            MACRO_EXECUTOR.app = self
+        except NameError:
+            # Защита на случай, если MACRO_EXECUTOR ещё не создан — но в текущей структуре он уже создан
+            pass
+
         if INPUT_MANAGER.init_error:
             self.after(100, lambda: self.update_status_label(localization.get_string('STATUS_ERROR', error=INPUT_MANAGER.init_error), is_error=True))
 
@@ -1249,6 +1277,65 @@ class App(ctk.CTk):
         if self.listener_thread: self.listener_thread.stop()
         if self.midi_output: self.midi_output.close()
         self.destroy()
+
+    def start_feedback(self, mapping_id, color_on="#00FF00", color_off="#303030"):
+        """Запускает мигающий фидбек для Loop или Toggle."""
+        self.active_feedback[mapping_id] = {
+            "state": True,
+            "color_on": color_on,
+            "color_off": color_off,
+        }
+
+        if not self.feedback_running:
+            self.feedback_running = True
+            self._feedback_tick()
+
+
+    def stop_feedback(self, mapping_id):
+        """Останавливает мигающий фидбек."""
+        if mapping_id in self.active_feedback:
+            del self.active_feedback[mapping_id]
+
+        # Если фидбеков больше нет — выключаем цикл
+        if not self.active_feedback:
+            self.feedback_running = False
+            # Восстанавливаем GUI-вид (цвета кнопок) к текущим маппингам
+            try:
+                # Обновим визуализатор целиком — проще и надежнее
+                if hasattr(self, "main_visualizer"):
+                    self.main_visualizer.update_states(self.mappings_data)
+            except Exception as e:
+                print(f"[FEEDBACK] restore error: {e}")
+
+
+
+    def _feedback_tick(self):
+        """Мигание 2Hz."""
+        if not self.feedback_running:
+            return
+
+        to_delete = []
+
+        for mapping_id, data in self.active_feedback.items():
+            data["state"] = not data["state"]
+            color = data["color_on"] if data["state"] else data["color_off"]
+
+            # обновим кнопку на Launchpad preview
+            btn = self.main_visualizer.get_button_by_id(mapping_id)
+            if btn:
+                try:
+                    btn.configure(fg_color=color)
+                except:
+                    pass
+            else:
+                to_delete.append(mapping_id)
+
+        # чистим устаревшие (кнопки, у которых нет визуализатора)
+        for dead in to_delete:
+            del self.active_feedback[dead]
+
+        self.after(500, self._feedback_tick)  # мигание 2 раза в секунду
+
 
 if __name__ == "__main__":
     ins = get_input_names()
