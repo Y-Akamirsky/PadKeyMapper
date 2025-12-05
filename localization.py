@@ -40,7 +40,15 @@ L10N = {
 
         # --- НОВЫЕ СТРОКИ ---
         'LEGACY_COLORS_LABEL': "Legacy Colors (Mini Mk1/S)",
-        'EDIT_SHOW_LABELS': "Show IDs"
+        'EDIT_SHOW_LABELS': "Show IDs",
+        'EDIT_VIRTUAL_PAD': "Virtual Pad / MIDI ID Selection (Layout: {layout})",
+        'EDIT_SHOW_LABELS': "Show IDs",
+        'COLOR_CUSTOM': "Custom",
+        'STATUS_COLOR_ERROR': "❌ Color must be an integer between 0 and 127!",
+        'STATUS_PROFILE_EXISTS': "❌ Profile with this name already exists!",
+        'PROFILE_LABEL': "Profile:",
+        'PROFILE_NEW': "New Profile",
+        'PROFILE_NEW_PROMPT': "Enter new profile name:"
     },
     'RU': {
         'APP_TITLE': "PadKey Mapper {version}",
@@ -76,7 +84,17 @@ L10N = {
 
         # --- НОВЫЕ СТРОКИ ---
         'LEGACY_COLORS_LABEL': "Режим старых цветов (Mini Mk1/S)",
-        'EDIT_SHOW_LABELS': "Показать ID"
+        'EDIT_SHOW_LABELS': "Показать ID",
+        'EDIT_VIRTUAL_PAD': "Виртуальный Пад / Выбор MIDI ID (Лейаут: {layout})",
+        'EDIT_SHOW_LABELS': "Показать ID",
+        'COLOR_CUSTOM': "Свой",
+        'STATUS_COLOR_ERROR': "❌ Цвет должен быть целым числом от 0 до 127!",
+        'STATUS_PROFILE_EXISTS': "❌ Профиль с таким именем уже существует!",
+        'PROFILE_LABEL': "Профиль:",
+        'PROFILE_NEW': "Новый Профиль",
+        'PROFILE_NEW_PROMPT': "Введите имя нового профиля:",
+        'UINPUT_MODULE_MISSING': "❌ Ошибка uinput: Не удалось создать устройство. Запустите 'sudo modprobe uinput', чтобы загрузить модуль ядра.",
+        'UINPUT_PERMISSION_DENIED': "❌ Ошибка uinput: Отказано в доступе. Убедитесь, что вы запустили приложение с помощью 'sudo $(which python) main.py'.",
     }
 }
 

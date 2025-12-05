@@ -1,118 +1,149 @@
 import os
 import sys
+import glob
 import time
 import json
 import threading
-
-if sys.platform.startswith('linux') and '/opt/pad-key-mapper' in os.path.abspath(__file__):
-    # Определяем относительный путь до site-packages,
-    # предполагая, что они лежат в /opt/pad-key-mapper/lib/pythonX.Y/site-packages
-
-    # Получаем версию Python (например, "python3.11")
-    py_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-
-    # Формируем путь к локальной site-packages
-    local_site_packages = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        'lib',
-        py_version,
-        'site-packages'
-    )
-
-    # Добавляем этот путь в sys.path для поиска модулей
-    if os.path.exists(local_site_packages):
-        sys.path.append(local_site_packages)
-        # print(f"DEBUG: Added custom path: {local_site_packages}") # Убрать для продакшена
-
-# -----------------------------------------------------------------
-
 import tkinter as tk
-import uinput
+import customtkinter as ctk
+
+# --- 0. НАСТРОЙКА ОКРУЖЕНИЯ (DEPENDENCY BOOTLOADER) ---
+def setup_paths():
+    if getattr(sys, 'frozen', False):
+        base_dir = sys._MEIPASS
+        if base_dir not in sys.path:
+            sys.path.insert(0, base_dir)
+        uinput_dir = os.path.join(base_dir, 'uinput')
+        if os.path.exists(uinput_dir) and uinput_dir not in sys.path:
+            sys.path.insert(0, uinput_dir)
+        return
+
+    current_file_path = os.path.abspath(__file__)
+    if sys.platform.startswith('linux'):
+        base_dir = os.path.dirname(current_file_path)
+        local_lib = os.path.join(base_dir, 'lib')
+        if os.path.exists(local_lib):
+            site_packages_glob = glob.glob(os.path.join(local_lib, 'python*', 'site-packages'))
+            if site_packages_glob:
+                site_pkg = site_packages_glob[0]
+                if site_pkg not in sys.path:
+                    sys.path.insert(0, site_pkg)
+
+setup_paths()
+
+# БЕЗОПАСНЫЙ ИМПОРТ UINPUT
+UINPUT_AVAILABLE = False
+UINPUT_ERROR = None
+
+try:
+    import uinput
+    UINPUT_AVAILABLE = True
+except ImportError as e:
+    UINPUT_ERROR = f"ImportError: {e}"
+except OSError as e:
+    UINPUT_ERROR = f"OSError: {e}"
+except Exception as e:
+    UINPUT_ERROR = f"Unknown Error: {e}"
+
 import localization
 import constants
 from mido import get_input_names, get_output_names, open_input, open_output, Message
-import customtkinter as ctk
 
-
-
+# --- НАСТРОЙКИ ПУТЕЙ ---
 if getattr(sys, 'frozen', False):
-    # Если запущено как скомпилированный EXE/AppImage
     BASE_DIR = sys._MEIPASS
 else:
-    # Если запущено как скрипт
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Определение директории для пользовательского конфига
-# Используем $XDG_CONFIG_HOME или ~/.config как дефолт
-# Сначала пытаемся получить $XDG_CONFIG_HOME, иначе используем ~/.config
 xdg_config_home = os.environ.get('XDG_CONFIG_HOME')
-
-# Если запущены через sudo, используем $SUDO_USER для получения домашней папки
 if os.environ.get('SUDO_USER') and not xdg_config_home:
     user_home = os.path.expanduser(f"~{os.environ.get('SUDO_USER')}")
     base_config_path = os.path.join(user_home, ".config")
 elif xdg_config_home:
     base_config_path = xdg_config_home
 else:
-    # Стандартный путь: ~/.config для текущего пользователя
     base_config_path = os.path.join(os.path.expanduser("~"), ".config")
 
-# Финальный путь: ~/.config/padkey-mapper
 CONFIG_DIR = os.path.join(base_config_path, "padkey-mapper")
+PROFILES_DIR = CONFIG_DIR
+SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
-# Создаем папку, если ее нет
 if not os.path.exists(CONFIG_DIR):
     try:
         os.makedirs(CONFIG_DIR, exist_ok=True)
     except Exception as e:
-        # Это должно сработать, если у пользователя есть права на запись в свою папку
-        print(f"❌ Критическая ошибка: Не удалось создать папку конфига {CONFIG_DIR}. Права? {e}")
+        print(f"❌ Critical Error: Could not create config dir {CONFIG_DIR}. {e}")
 
+# --- 1. МЕНЕДЖЕР НАСТРОЕК (App Settings) ---
+class SettingsManager:
+    DEFAULT_SETTINGS = {
+        "language": "EN",
+        "theme": "Dark",
+        "legacy_colors": False,
+        "last_profile": "default.json",
+        "last_layout": "Launchpad Mini/S/MK2/X"
+    }
 
-# --- 1. ЛОГИКА КОНВЕРТАЦИИ ЦВЕТОВ ---
+    @staticmethod
+    def load():
+        if os.path.exists(SETTINGS_FILE):
+            try:
+                with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    merged = SettingsManager.DEFAULT_SETTINGS.copy()
+                    merged.update(data)
+                    return merged
+            except Exception as e:
+                print(f"⚠️ Error loading settings: {e}")
+        return SettingsManager.DEFAULT_SETTINGS.copy()
 
-# Маппинг: Современный цвет (Velocity) -> Старый битовый цвет (Green[5-4] Clear[3] Red[1-0])
-# Основано на значениях из constants.LAUNCHPAD_COLORS
+    @staticmethod
+    def save(settings_dict):
+        try:
+            with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(settings_dict, f, indent=4)
+        except Exception as e:
+            print(f"❌ Error saving settings: {e}")
+
+# --- 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 COLOR_TRANSLATION_TABLE = {
-    0: 0,    # Off
-    3: 1,    # Red Low (Legacy: 1)
-    5: 3,    # Red Full (Legacy: 3)
-    7: 17,   # Amber Low (Legacy: Green Low 16 + Red Low 1 = 17)
-    9: 48,   # Green Full (Legacy: 48 [110000])
-    13: 51,  # Yellow Full (Legacy: Green Full 48 + Red Full 3 = 51)
-    15: 16,  # Green Low (Legacy: 16 [010000])
-    63: 51,  # White -> Legacy Yellow Full (Hardware limit)
-    127: 51  # Max -> Legacy Yellow Full
+    0: 0, 3: 1, 5: 3, 7: 17, 9: 48, 13: 51, 15: 16, 63: 51, 127: 51
 }
-
-# --- 2. УПРАВЛЕНИЕ КОНФИГУРАЦИЕЙ И ВВОДОМ ---
 
 def load_layouts(filename="layouts.json"):
     path = os.path.join(BASE_DIR, filename)
-    default_layout = {
-        "type": "Mini",
-        "cc_row_start": 104, "cc_row_end": 111,
-        "side_notes": [8, 24, 40, 56, 72, 88, 104, 120],
-        "grid_start_note": 0,
-    }
-    predefined_layouts = { "Launchpad Mini/MK2/X (Fallback)": default_layout }
+    layouts = {}
     try:
-        with open(filename, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        predefined_layouts.update(data)
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                layouts = json.load(f)
     except Exception as e:
-        print(f"⚠️ Ошибка загрузки layouts.json: {e}")
-    return predefined_layouts
+        print(f"⚠️ Error loading layouts.json: {e}")
+    return layouts
 
-def load_config(filename="config.json"):
-    # ИСПРАВЛЕНО: Теперь path используется для открытия файла
-    path = os.path.join(CONFIG_DIR, filename)
+def get_available_profiles():
+    files = glob.glob(os.path.join(PROFILES_DIR, "*.json"))
+    profiles = [os.path.basename(f) for f in files if "settings.json" not in f]
+    if not profiles:
+        default_path = os.path.join(PROFILES_DIR, "default.json")
+        try:
+            with open(default_path, 'w') as f:
+                json.dump({"mappings": []}, f)
+            return ["default.json"]
+        except Exception as e:
+            return []
+    return sorted(profiles)
+
+def load_profile_data(filename):
+    path = os.path.join(PROFILES_DIR, filename)
     key_map = {}
     cc_map = {}
     all_mappings_data = []
 
+    if not os.path.exists(path):
+        return key_map, cc_map, all_mappings_data
+
     try:
-        # Открываем по полному пути
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except Exception:
@@ -125,13 +156,16 @@ def load_config(filename="config.json"):
         m_color = mapping.get('color', 0)
 
         keys_to_press = []
+        # Простая обработка (будет расширена для пауз/мыши позже)
         for key_str in m_keys_str:
             if key_str in constants.KEY_MAPPINGS:
                 keys_to_press.append(constants.KEY_MAPPINGS[key_str])
             elif len(key_str) == 1 and (key_str.isalpha() or key_str.isdigit()):
                 try:
-                    keys_to_press.append(getattr(uinput, f'KEY_{key_str.upper()}'))
-                except AttributeError:
+                    attr_name = f'KEY_{key_str.upper()}'
+                    if UINPUT_AVAILABLE and hasattr(uinput, attr_name):
+                        keys_to_press.append(getattr(uinput, attr_name))
+                except (AttributeError, NameError):
                     pass
 
         entry = {
@@ -150,9 +184,8 @@ def load_config(filename="config.json"):
 
     return key_map, cc_map, all_mappings_data
 
-def save_config(mappings_data, filename="config.json"):
-    # ИСПРАВЛЕНО: Теперь path используется для открытия файла
-    path = os.path.join(CONFIG_DIR, filename)
+def save_profile_data(mappings_data, filename):
+    path = os.path.join(PROFILES_DIR, filename)
     data_to_save = {'mappings': []}
     for mapping in mappings_data:
         m_id = mapping['id']
@@ -163,45 +196,86 @@ def save_config(mappings_data, filename="config.json"):
             'description': mapping['description'], 'color': mapping.get('color', 0)
         })
     try:
-        # Открываем по полному пути
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(data_to_save, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"❌ Ошибка сохранения: {e}")
+        print(f"❌ Error saving profile: {e}")
         return False
 
+# --- 3. INPUT MANAGER ---
 class InputManager:
     def __init__(self):
         self.device = None
-        all_keys = list(constants.KEY_MAPPINGS.values()) + [getattr(uinput, f'KEY_{c.upper()}') for c in 'abcdefghijklmnopqrstuvwxyz0123456789']
-        try: self.device = uinput.Device(all_keys)
-        except Exception: self.device = None
+        self.init_error = UINPUT_ERROR
+        if not UINPUT_AVAILABLE or self.init_error: return
+
+        all_keys = set()
+        # 1. Keyboard keys
+        for key_code in constants.KEY_MAPPINGS.values():
+            all_keys.add(key_code)
+        for char in 'abcdefghijklmnopqrstuvwxyz0123456789':
+            attr_name = f'KEY_{char.upper()}'
+            if hasattr(uinput, attr_name):
+                all_keys.add(getattr(uinput, attr_name))
+
+        # 2. Mouse Buttons & Axes (Подготовка для будущих задач)
+        try:
+            mouse_capabilities = [
+                uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE,
+                uinput.REL_X, uinput.REL_Y, uinput.REL_WHEEL
+            ]
+            for cap in mouse_capabilities:
+                all_keys.add(cap)
+        except AttributeError:
+            pass # Если старая версия uinput
+
+        final_key_list = list(all_keys)
+        if not final_key_list:
+            self.init_error = "Key list is empty."
+            return
+
+        try:
+            self.device = uinput.Device(final_key_list)
+            print(f"✅ uinput device created.")
+        except OSError as e:
+            error_message = str(e)
+            if "No such device" in error_message or "Errno 19" in error_message:
+                self.init_error = localization.get_string('UINPUT_MODULE_MISSING')
+            elif "Permission denied" in error_message or "Errno 13" in error_message:
+                self.init_error = localization.get_string('UINPUT_PERMISSION_DENIED')
+            else:
+                self.init_error = f"OS Error: {e}"
+        except Exception as e:
+            self.init_error = str(e)
 
     def key_down(self, keys):
         if not self.device or not keys: return
-        for key in keys: self.device.emit(key, 1, syn=False)
-        self.device.syn()
+        try:
+            for key in keys: self.device.emit(key, 1, syn=False)
+            self.device.syn()
+        except OSError: pass
 
     def key_up(self, keys):
         if not self.device or not keys: return
-        for key in keys: self.device.emit(key, 0, syn=False)
-        self.device.syn()
+        try:
+            for key in keys: self.device.emit(key, 0, syn=False)
+            self.device.syn()
+        except OSError: pass
 
     def send_keystroke(self, keys):
-        if not self.device or not keys: return
+        if not self.device: return
         self.key_down(keys)
         time.sleep(0.01)
         self.key_up(keys)
-        display_keys = [constants.REVERSE_KEY_MAPPINGS.get(key, 'UNKNOWN') for key in keys]
-        print(f"-> Имитировано: {' + '.join(display_keys)}")
+        # print(f"-> Typed: {keys}")
 
 INPUT_MANAGER = InputManager()
 key_down = INPUT_MANAGER.key_down
 key_up = INPUT_MANAGER.key_up
 send_keystroke = INPUT_MANAGER.send_keystroke
 
-# --- 3. MIDI THREAD ---
+# --- 4. MIDI THREAD ---
 class MidiListenerThread(threading.Thread):
     def __init__(self, app_instance, port_name):
         super().__init__()
@@ -213,6 +287,10 @@ class MidiListenerThread(threading.Thread):
         self._stop_event.set()
 
     def run(self):
+        if INPUT_MANAGER.init_error:
+            self.app.update_status_label(localization.get_string('STATUS_ERROR', error=INPUT_MANAGER.init_error), is_error=True)
+            return
+
         try:
             self.app.update_status_label(localization.get_string('STATUS_INIT'))
             self.send_initial_lighting()
@@ -231,34 +309,192 @@ class MidiListenerThread(threading.Thread):
                                     key_down(keys_data['keys'])
                                 elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
                                     key_up(keys_data['keys'])
-
                         elif msg.type == 'control_change' and msg.value > 0:
                             id_val = msg.control
                             if id_val in self.app.cc_map:
                                 send_keystroke(self.app.cc_map[id_val]['keys'])
                     else:
                         time.sleep(0.005)
-
             self.app.update_status_label(localization.get_string('STATUS_STOPPED'))
         except Exception as e:
-            self.app.update_status_label(localization.get_string('STATUS_ERROR', error=e))
+            self.app.update_status_label(localization.get_string('STATUS_ERROR', error=str(e)), is_error=True)
 
     def send_initial_lighting(self):
         if not self.app.midi_output: return
-
-        # NOTE MAPPINGS
         for note_id, data in self.app.key_map.items():
             safe_color = self.app.get_safe_color(data['color'])
             try: self.app.midi_output.send(Message('note_on', note=int(note_id), velocity=safe_color))
             except: pass
-
-        # CC MAPPINGS
         for cc_id, data in self.app.cc_map.items():
             safe_color = self.app.get_safe_color(data['color'])
             try: self.app.midi_output.send(Message('control_change', control=int(cc_id), value=safe_color))
             except: pass
 
-# --- 4. GUI: Key Selection & Edit Window ---
+# --- 5. GUI COMPONENTS ---
+
+class VirtualPadVisualizer(ctk.CTkFrame):
+    """
+    Универсальный виджет для отображения Launchpad.
+    Используется и в главном окне (просмотр), и в редакторе (выбор).
+    """
+    def __init__(self, master, layout_config, button_callback=None, btn_size=30, **kwargs):
+        super().__init__(master, **kwargs)
+        self.layout_config = layout_config
+        self.button_callback = button_callback
+        self.btn_size = btn_size
+        self.buttons = {} # (type, id) -> Button
+
+        self.render()
+
+    def render(self):
+        # Очистка
+        for widget in self.winfo_children(): widget.destroy()
+        self.buttons = {}
+
+        layout_type = self.layout_config.get("type", "Mini")
+
+        # Настройка равномерной сетки, чтобы колонки не "плавали"
+        if layout_type == "Universal":
+            cols = 16
+        elif layout_type == "Pro":
+            cols = 10
+        else: # Mini
+            cols = 9
+
+        # uniform="cols" гарантирует одинаковую ширину для всех колонок
+        for i in range(cols):
+            self.grid_columnconfigure(i, weight=1, uniform="cols")
+
+        # Хелпер для создания кнопки
+        def add_btn(row, col, label, m_type, m_id, radius, is_side=False):
+            # Цвет по умолчанию
+            default_color = "gray30"
+            if is_side: default_color = "gray20"
+
+            btn = ctk.CTkButton(
+                self, text=label, width=self.btn_size, height=self.btn_size,
+                corner_radius=radius,
+                fg_color=default_color,
+                font=("Arial", 9),
+                hover_color="gray50"
+            )
+
+            if self.button_callback:
+                btn.configure(command=lambda t=m_type, i=m_id: self.button_callback(i, t))
+            else:
+                btn.configure(state="disabled", text_color_disabled="white")
+
+            btn.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+            self.buttons[(m_type, m_id)] = btn
+
+        # --- ОТРИСОВКА В ЗАВИСИМОСТИ ОТ ЛЕЙАУТА ---
+        ROUND_RADIUS = self.btn_size // 2
+        SQUARE_RADIUS = 4
+
+        if layout_type == "Mini":
+            cc_start = self.layout_config.get("cc_row_start", 104)
+            cc_end = self.layout_config.get("cc_row_end", 111)
+            side_notes = self.layout_config.get("side_notes", [])
+
+            # Top CC Row
+            for idx, cc_id in enumerate(range(cc_start, cc_end + 1)):
+                add_btn(0, idx, f"{cc_id}", 'cc', cc_id, ROUND_RADIUS)
+
+            # Grid 8x8 + Side
+            for r in range(8):
+                for c in range(8):
+                    note_id = r * 16 + c
+                    add_btn(r+1, c, "", 'note', note_id, SQUARE_RADIUS)
+                if r < len(side_notes):
+                    s_id = side_notes[r]
+                    add_btn(r+1, 8, f"{s_id}", 'note', s_id, ROUND_RADIUS, is_side=True)
+
+        elif layout_type == "Pro":
+             top = self.layout_config.get("top_notes", [])
+             left = self.layout_config.get("left_notes", [])
+             right = self.layout_config.get("right_notes", [])
+             bottom = self.layout_config.get("bottom_notes", [])
+             grid_start = self.layout_config.get("grid_start_note", 11)
+
+             for c, n_id in enumerate(top):
+                 add_btn(0, c+1, f"{n_id}", 'note', n_id, ROUND_RADIUS)
+
+             for r in range(8):
+                 # Left
+                 if r < len(left):
+                     add_btn(r+1, 0, f"{left[r]}", 'note', left[r], ROUND_RADIUS, is_side=True)
+                 # Center
+                 for c in range(8):
+                     note_id = grid_start + (7-r) * 10 + c
+                     add_btn(r+1, c+1, "", 'note', note_id, SQUARE_RADIUS)
+                 # Right
+                 if r < len(right):
+                     add_btn(r+1, 9, f"{right[r]}", 'note', right[r], ROUND_RADIUS, is_side=True)
+
+             for c, n_id in enumerate(bottom):
+                 add_btn(9, c+1, f"{n_id}", 'note', n_id, ROUND_RADIUS)
+
+        elif layout_type == "Universal":
+            notes = self.layout_config.get("notes", [])
+            ccs = self.layout_config.get("cc", [])
+
+            # CC (2 ряда по 16) - делаем компактнее, если их 128
+            # Но для простоты выводим как есть
+            row = 0
+            col = 0
+            for i in ccs:
+                add_btn(row, col, str(i), 'cc', i, ROUND_RADIUS, is_side=True)
+                col += 1
+                if col > 15:
+                    col = 0
+                    row += 1
+
+            # Разделитель
+            row += 1
+
+            # Notes
+            col = 0
+            for i in notes:
+                add_btn(row, col, str(i), 'note', i, SQUARE_RADIUS)
+                col += 1
+                if col > 15:
+                    col = 0
+                    row += 1
+
+    def update_states(self, mappings_data, current_selection=None):
+        """
+        Обновляет цвета и текст кнопок на основе маппингов.
+        mappings_data: список словарей маппингов.
+        current_selection: словарь {'type':..., 'id':...} для подсветки редактируемого.
+        """
+        # Сброс цветов
+        layout_type = self.layout_config.get("type", "Mini")
+        for (m_type, m_id), btn in self.buttons.items():
+            base_color = "gray30"
+            if m_type == 'cc' or (layout_type == "Mini" and m_id % 16 == 8): base_color = "gray20"
+            btn.configure(fg_color=base_color, text=str(m_id) if (layout_type!="Mini" or m_type=='cc' or m_id%16==8) else "")
+
+        # Применение маппингов (индекс + цвет)
+        for idx, m in enumerate(mappings_data):
+            if m['id'] == 'NEW': continue
+            try:
+                mid = int(m['id'])
+                mtype = m['type']
+                if (mtype, mid) in self.buttons:
+                    btn = self.buttons[(mtype, mid)]
+                    # Отображаем порядковый номер маппинга (idx + 1)
+                    btn.configure(text=str(idx + 1), fg_color="teal" if mtype=='note' else "darkorange")
+            except: pass
+
+        # Подсветка текущего выделения (для редактора)
+        if current_selection:
+            cs_id = current_selection.get('id')
+            cs_type = current_selection.get('type')
+            try: cs_id = int(cs_id)
+            except: pass
+
+            if (cs_type, cs_id) in self.buttons:
+                self.buttons[(cs_type, cs_id)].configure(fg_color="red")
 
 class KeySelectionWindow(ctk.CTkToplevel):
     def __init__(self, master, target_entry):
@@ -267,12 +503,10 @@ class KeySelectionWindow(ctk.CTkToplevel):
         self.geometry("300x500")
         self.target_entry = target_entry
         self.attributes("-topmost", True)
+        self.transient(master)
 
         self.scroll_frame = ctk.CTkScrollableFrame(self, label_text=localization.get_string('KEY_SELECT_LABEL'))
         self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        self.scroll_frame.bind_all("<Button-4>", self._on_mouse_wheel)
-        self.scroll_frame.bind_all("<Button-5>", self._on_mouse_wheel)
-        self.scroll_frame.bind_all("<MouseWheel>", self._on_mouse_wheel)
 
         sorted_keys = sorted(constants.KEY_MAPPINGS.keys())
         for key_name in sorted_keys:
@@ -289,16 +523,10 @@ class KeySelectionWindow(ctk.CTkToplevel):
                                 height=25, anchor="w", fg_color="transparent", border_width=1)
             btn.pack(fill="x", pady=2)
 
-    def _on_mouse_wheel(self, event):
-        if hasattr(self.scroll_frame, '_parent_canvas'):
-            canvas = self.scroll_frame._parent_canvas
-            if event.num == 4 or event.delta > 0: canvas.yview_scroll(-1, "units")
-            elif event.num == 5 or event.delta < 0: canvas.yview_scroll(1, "units")
-
     def insert_key(self, key_value):
         current_text = self.target_entry.get().strip()
-        key_to_insert = key_value if key_value in constants.KEY_MAPPINGS else key_value
-        if current_text and not (current_text.endswith("+") or current_text.endswith(" ")):
+        key_to_insert = key_value
+        if current_text and not current_text.endswith("+") and not current_text.endswith(" "):
             new_text = f"{current_text} + {key_to_insert}"
         else:
             new_text = f"{current_text}{key_to_insert}"
@@ -311,19 +539,22 @@ class EditMappingWindow(ctk.CTkToplevel):
         super().__init__(master)
         title_id = mapping_data['id'] if mapping_data['id'] != 'NEW' else localization.get_string('EDIT_NEW_TITLE')
         self.title(localization.get_string('EDIT_TITLE', id=title_id))
-        self.minsize(600, 780)
+
+        # Адаптивный размер окна редактора
+        if layout_config.get('type') == 'Universal':
+            self.geometry("900x800")
+        else:
+            self.geometry("600x750")
 
         self.mapping_data = mapping_data
         self.index = index
         self.master_app = master
         self.layout_config = layout_config
 
-        # Список кнопок для обновления меток (btn_object, id_text)
-        self.virtual_buttons = []
-
         self.grid_columnconfigure(1, weight=1)
         self.create_widgets()
         self.grab_set()
+        self.transient(master)
         self.after(100, lambda: self.attributes("-topmost", True))
 
     def open_key_menu(self):
@@ -333,130 +564,94 @@ class EditMappingWindow(ctk.CTkToplevel):
         self.type_var.set(midi_type)
         self.id_entry.delete(0, 'end')
         self.id_entry.insert(0, str(midi_id))
-
-    def toggle_labels(self):
-        """Переключает видимость текста (ID) на кнопках"""
-        show = self.labels_var.get()
-        for btn, label_text in self.virtual_buttons:
-            btn.configure(text=label_text if show else "")
+        # Обновляем визуализацию
+        self.visualizer.update_states(self.master_app.mappings_data,
+                                      current_selection={'type': midi_type, 'id': midi_id})
 
     def create_widgets(self):
+        # Frame for Inputs
+        input_frame = ctk.CTkFrame(self, fg_color="transparent")
+        input_frame.pack(fill="x", padx=10, pady=10)
+        input_frame.grid_columnconfigure(1, weight=1)
+
         row = 0
-        ctk.CTkLabel(self, text=localization.get_string('EDIT_MIDI_ID'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, padx=10, pady=10, sticky="w")
-
+        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_MIDI_ID'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w")
         self.type_var = ctk.StringVar(value=self.mapping_data['type'])
-        type_options = ["note"]
-        if self.layout_config.get("type", "Mini") == "Mini": type_options.append("cc")
-        ctk.CTkOptionMenu(self, values=type_options, variable=self.type_var, width=80).grid(row=row, column=1, padx=10, sticky="w")
-
-        self.id_entry = ctk.CTkEntry(self, placeholder_text="ID", width=80)
+        ctk.CTkOptionMenu(input_frame, values=["note", "cc"], variable=self.type_var, width=80).grid(row=row, column=1, sticky="w", padx=5)
+        self.id_entry = ctk.CTkEntry(input_frame, placeholder_text="ID", width=80)
         curr_id = str(self.mapping_data['id']) if self.mapping_data['id'] != 'NEW' else ''
         self.id_entry.insert(0, curr_id)
         self.id_entry.grid(row=row, column=1, padx=(100, 0), sticky="w")
 
         row += 1
-        ctk.CTkLabel(self, text=localization.get_string('EDIT_KEYS'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_KEYS'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
         keys_str = " + ".join(self.mapping_data['keys_str'])
-        self.keys_entry = ctk.CTkEntry(self, placeholder_text="Click button ->")
+        self.keys_entry = ctk.CTkEntry(input_frame, placeholder_text="Click button ->")
         self.keys_entry.insert(0, keys_str)
-        self.keys_entry.grid(row=row, column=1, padx=(10, 50), pady=10, sticky="ew")
-        ctk.CTkButton(self, text="⌨️", width=40, command=self.open_key_menu).grid(row=row, column=1, padx=(0, 10), sticky="e")
+        self.keys_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
+        ctk.CTkButton(input_frame, text="⌨️", width=40, command=self.open_key_menu).grid(row=row, column=2, sticky="e")
 
         row += 1
-        ctk.CTkLabel(self, text=localization.get_string('EDIT_DESC'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, padx=10, pady=10, sticky="w")
-        self.desc_entry = ctk.CTkEntry(self)
+        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_DESC'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
+        self.desc_entry = ctk.CTkEntry(input_frame)
         self.desc_entry.insert(0, self.mapping_data['description'])
-        self.desc_entry.grid(row=row, column=1, padx=10, sticky="ew")
+        self.desc_entry.grid(row=row, column=1, columnspan=2, sticky="ew", padx=5)
 
         row += 1
-        ctk.CTkLabel(self, text=localization.get_string('EDIT_COLOR'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_COLOR'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
+        color_sub_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        color_sub_frame.grid(row=row, column=1, columnspan=2, sticky="ew", padx=5)
+
         initial_color = self.mapping_data.get('color', 0)
-        initial_color_name = next((v for k, v in constants.LAUNCHPAD_COLORS.items() if k == initial_color), f"Custom ({initial_color})")
+        color_names = list(constants.LAUNCHPAD_COLORS.values())
+        initial_color_name = next((v for k, v in constants.LAUNCHPAD_COLORS.items() if k == initial_color), localization.get_string('COLOR_CUSTOM'))
+
         self.color_var = ctk.StringVar(value=initial_color_name)
-        self.color_select = ctk.CTkOptionMenu(self, values=list(constants.LAUNCHPAD_COLORS.values()), variable=self.color_var)
-        self.color_select.grid(row=row, column=1, padx=10, sticky="ew")
+        self.color_select = ctk.CTkOptionMenu(color_sub_frame, values=color_names, variable=self.color_var, width=150, command=self._on_preset_color_select)
+        self.color_select.pack(side="left")
+        self.manual_color_entry = ctk.CTkEntry(color_sub_frame, width=50, placeholder_text="0-127")
+        self.manual_color_entry.insert(0, str(initial_color))
+        self.manual_color_entry.pack(side="left", padx=5)
 
-        row += 1
-        # Хедер для виртуального пада с переключателем ID
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.grid(row=row, column=0, columnspan=2, pady=(20, 0), sticky="ew", padx=10)
-        ctk.CTkLabel(header_frame, text=localization.get_string('EDIT_VIRTUAL_PAD'), font=ctk.CTkFont(weight="bold")).pack(side="left")
+        # Separator
+        ctk.CTkFrame(self, height=2, fg_color="gray40").pack(fill="x", padx=10, pady=5)
 
-        # Переключатель показа ID
-        self.labels_var = ctk.BooleanVar(value=False)
-        self.labels_switch = ctk.CTkSwitch(header_frame, text=localization.get_string('EDIT_SHOW_LABELS', default="Show IDs"),
-                                           variable=self.labels_var, command=self.toggle_labels, width=50)
-        self.labels_switch.pack(side="right")
+        # Virtual Pad
+        ctk.CTkLabel(self, text=localization.get_string('EDIT_VIRTUAL_PAD', layout=self.layout_config.get('type')), font=ctk.CTkFont(weight="bold")).pack(pady=5)
 
-        self.midi_frame = ctk.CTkFrame(self)
-        self.midi_frame.grid(row=row+1, column=0, columnspan=2, padx=10, pady=10)
+        # Scrollable container for Universal layout support
+        pad_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        pad_container.pack(fill="both", expand=True, padx=10)
 
-        self.draw_virtual_grid()
+        # Using the new Reusable Visualizer
+        self.visualizer = VirtualPadVisualizer(
+            pad_container,
+            self.layout_config,
+            button_callback=self.map_midi_pad,
+            btn_size=35 if self.layout_config.get('type') != 'Universal' else 25 # Smaller for Universal
+        )
+        self.visualizer.pack()
 
+        # Initial visual state
+        self.visualizer.update_states(self.master_app.mappings_data, current_selection={'type': self.mapping_data['type'], 'id': self.mapping_data['id']})
+
+        # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=row+2, column=0, columnspan=2, pady=10)
-        ctk.CTkButton(btn_frame, text=localization.get_string('EDIT_SAVE'), command=self.save_and_close).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text=localization.get_string('EDIT_CANCEL'), command=self.destroy, fg_color="gray").pack(side="left", padx=5)
+        btn_frame.pack(fill="x", pady=10)
+        ctk.CTkButton(btn_frame, text=localization.get_string('EDIT_SAVE'), command=self.save_and_close).pack(side="left", expand=True, padx=10)
+        ctk.CTkButton(btn_frame, text=localization.get_string('EDIT_CANCEL'), command=self.destroy, fg_color="gray").pack(side="left", expand=True, padx=10)
 
-    def draw_virtual_grid(self):
-        layout_type = self.layout_config.get("type", "Mini")
-        ROUND_RADIUS = 20
-        SQUARE_RADIUS = 5
-
-        def create_pad_btn(row, col, label, m_type, m_id, radius, is_side=False):
-            is_active = (self.mapping_data['type'] == m_type and str(self.mapping_data['id']) == str(m_id))
-            if is_active: color = "darkorange" if m_type == 'cc' else ("purple" if is_side else "teal")
-            else: color = "gray60" if (m_type == 'cc' or is_side) else "gray40"
-
-            # Текст изначально пустой, если не включен свитч (но мы его обновим в конце метода)
-            btn = ctk.CTkButton(self.midi_frame, text="", width=40, height=40, corner_radius=radius,
-                                fg_color=color,
-                                command=lambda id=m_id, t=m_type: self.map_midi_pad(id, t))
-            btn.grid(row=row, column=col, padx=2 if not is_side else 5, pady=2)
-            self.virtual_buttons.append((btn, label))
-
-        if layout_type == "Mini":
-            cc_start = self.layout_config.get("cc_row_start", 104)
-            cc_end = self.layout_config.get("cc_row_end", 111)
-            side_notes = self.layout_config.get("side_notes", [])
-
-            for idx, cc_id in enumerate(range(cc_start, cc_end + 1)):
-                create_pad_btn(0, idx, f"CC{cc_id}", 'cc', cc_id, ROUND_RADIUS)
-            for r in range(8):
-                row_offset = r * 16
-                for c in range(8):
-                    note_id = row_offset + c
-                    create_pad_btn(r+1, c, f"{note_id}", 'note', note_id, SQUARE_RADIUS)
-                if r < len(side_notes):
-                    s_id = side_notes[r]
-                    create_pad_btn(r+1, 8, f"S{s_id}", 'note', s_id, ROUND_RADIUS, is_side=True)
-
-        elif layout_type == "Pro":
-            top_notes = self.layout_config.get("top_notes", [])
-            left_notes = self.layout_config.get("left_notes", [])
-            right_notes = self.layout_config.get("right_notes", [])
-            bottom_notes = self.layout_config.get("bottom_notes", [])
-            grid_start = self.layout_config.get("grid_start_note", 11)
-
-            for c, n_id in enumerate(top_notes):
-                create_pad_btn(0, c+1, f"T{n_id}", 'note', n_id, ROUND_RADIUS)
-            for r in range(8):
-                if r < len(left_notes):
-                    create_pad_btn(r+1, 0, f"L{left_notes[r]}", 'note', left_notes[r], ROUND_RADIUS, is_side=True)
-                for c in range(8):
-                    note_id = grid_start + (7-r) * 10 + c
-                    create_pad_btn(r+1, c+1, f"{note_id}", 'note', note_id, SQUARE_RADIUS)
-                if r < len(right_notes):
-                    create_pad_btn(r+1, 9, f"R{right_notes[r]}", 'note', right_notes[r], ROUND_RADIUS, is_side=True)
-            for c, n_id in enumerate(bottom_notes):
-                create_pad_btn(9, c+1, f"B{n_id}", 'note', n_id, ROUND_RADIUS)
-
-        self.toggle_labels()
+    def _on_preset_color_select(self, choice):
+        for k, v in constants.LAUNCHPAD_COLORS.items():
+            if v == choice:
+                self.manual_color_entry.delete(0, 'end')
+                self.manual_color_entry.insert(0, str(k))
+                return
 
     def save_and_close(self):
         try: new_id_val = int(self.id_entry.get().strip())
         except ValueError:
-            self.master_app.update_status_label(localization.get_string('STATUS_ID_ERROR'))
+            self.master_app.update_status_label(localization.get_string('STATUS_ID_ERROR'), is_error=True)
             return
 
         new_type = self.type_var.get()
@@ -464,14 +659,17 @@ class EditMappingWindow(ctk.CTkToplevel):
         new_keys_raw = self.keys_entry.get().strip()
         new_keys_list = [k.strip() for k in new_keys_raw.replace(' ', '').split('+') if k.strip()]
 
-        col_str = self.color_select.get()
-        try: new_color = int(col_str[col_str.find('(')+1 : col_str.find(')')])
-        except: new_color = 0
+        try:
+            new_color = int(self.manual_color_entry.get().strip())
+            if not 0 <= new_color <= 127: raise ValueError
+        except ValueError:
+            self.master_app.update_status_label(localization.get_string('STATUS_COLOR_ERROR'), is_error=True)
+            return
 
         current_id_str = str(self.mapping_data['id'])
         if current_id_str != str(new_id_val) or current_id_str == 'NEW':
             if self.master_app.is_duplicate_mapping(new_type, new_id_val, self.index):
-                self.master_app.update_status_label(localization.get_string('STATUS_MAPPING_USED', type=new_type.upper(), id=new_id_val))
+                self.master_app.update_status_label(localization.get_string('STATUS_MAPPING_USED', type=new_type.upper(), id=new_id_val), is_error=True)
                 return
 
         self.master_app.mappings_data[self.index].update({
@@ -482,48 +680,75 @@ class EditMappingWindow(ctk.CTkToplevel):
         self.destroy()
 
 class MappingTableFrame(ctk.CTkScrollableFrame):
-    def __init__(self, master, mappings_data, **kwargs):
+    def __init__(self, master, app_instance, mappings_data, **kwargs):
         super().__init__(master, label_text=localization.get_string('MAPPING_LIST_LABEL'), **kwargs)
-        self.app_master = master
-        self.grid_columnconfigure(2, weight=1)
+        self.app_master = app_instance # <-- Исправлено: теперь это ссылка на App, а не на master frame
+        self.grid_columnconfigure(3, weight=1)
         self.create_widgets(mappings_data)
-        self.bind_all("<Button-4>", self._on_mouse_wheel)
-        self.bind_all("<Button-5>", self._on_mouse_wheel)
-        self.bind_all("<MouseWheel>", self._on_mouse_wheel)
-
-    def _on_mouse_wheel(self, event):
-        if hasattr(self, '_parent_canvas'):
-            if event.num == 4 or event.delta > 0: self._parent_canvas.yview_scroll(-1, "units")
-            elif event.num == 5 or event.delta < 0: self._parent_canvas.yview_scroll(1, "units")
 
     def refresh_table(self, mappings_data):
         for widget in self.winfo_children(): widget.destroy()
         self.create_widgets(mappings_data)
 
     def create_widgets(self, mappings_data):
-        ctk.CTkButton(self, text=localization.get_string('ADD_MAPPING_BTN'), command=self.app_master.add_new_mapping).grid(row=0, column=0, columnspan=5, sticky="ew", pady=5)
+        ctk.CTkButton(self, text=localization.get_string('ADD_MAPPING_BTN'), command=self.app_master.add_new_mapping).grid(row=0, column=0, columnspan=6, sticky="ew", pady=5)
+
+        # Headers
+        headers = ["#", "MIDI", "Keys", "Desc", "", ""]
+        for i, h in enumerate(headers):
+            ctk.CTkLabel(self, text=h, font=("Arial", 12, "bold")).grid(row=1, column=i, padx=5, sticky="w")
+
         for i, m in enumerate(mappings_data):
             if m['id'] == 'NEW': continue
-            r = i + 1
-            ctk.CTkLabel(self, text=f"{m['type'].upper()}: {m['id']}").grid(row=r, column=0, padx=5, sticky="w")
-            ctk.CTkLabel(self, text=" + ".join([constants.KEY_DISPLAY_MAPPINGS.get(k, k) for k in m['keys_str']])).grid(row=r, column=1, padx=5, sticky="w")
-            ctk.CTkLabel(self, text=m['description']).grid(row=r, column=2, padx=5, sticky="w")
-            ctk.CTkButton(self, text="✎", width=30, command=lambda x=i: self.app_master.open_edit_window(x)).grid(row=r, column=3, padx=2)
-            ctk.CTkButton(self, text="🗑️", width=30, fg_color="firebrick", command=lambda x=i: self.app_master.delete_mapping(x)).grid(row=r, column=4, padx=2)
+            r = i + 2
+            # Index #
+            ctk.CTkLabel(self, text=f"{i+1}").grid(row=r, column=0, padx=5)
 
-# --- 5. MAIN APP ---
+            # MIDI ID
+            ctk.CTkLabel(self, text=f"{m['type'][0].upper()}:{m['id']}").grid(row=r, column=1, padx=5, sticky="w")
+
+            # Keys
+            display_keys = [constants.KEY_DISPLAY_MAPPINGS.get(k, k) for k in m['keys_str']]
+            key_text = " + ".join(display_keys)
+            if len(key_text) > 20: key_text = key_text[:17] + "..."
+            ctk.CTkLabel(self, text=key_text).grid(row=r, column=2, padx=5, sticky="w")
+
+            # Description
+            desc = m['description']
+            if len(desc) > 20: desc = desc[:17] + "..."
+            ctk.CTkLabel(self, text=desc).grid(row=r, column=3, padx=5, sticky="w")
+
+            # Controls
+            ctk.CTkButton(self, text="✎", width=30, command=lambda x=i: self.app_master.open_edit_window(x)).grid(row=r, column=4, padx=2)
+            ctk.CTkButton(self, text="🗑️", width=30, fg_color="firebrick", command=lambda x=i: self.app_master.delete_mapping(x)).grid(row=r, column=5, padx=2)
+
+# --- 6. MAIN APP ---
 
 class App(ctk.CTk):
     def __init__(self, port_name, output_port_name):
         super().__init__()
+
+        self.settings = SettingsManager.load()
+        ctk.set_appearance_mode(self.settings.get("theme", "Dark"))
+        localization.set_language(self.settings.get("language", "EN"))
 
         self.lang_options = localization.get_available_languages()
         self.language_var = ctk.StringVar(value=localization.CURRENT_LANG)
         self.language_var.trace_add("write", self.change_language)
 
         self.layouts = load_layouts()
-        self.current_layout_name = next(iter(self.layouts.keys()))
-        self.key_map, self.cc_map, self.mappings_data = load_config()
+        self.current_layout_name = self.settings.get("last_layout", next(iter(self.layouts.keys()), "Universal (All MIDI IDs)"))
+        if self.current_layout_name not in self.layouts:
+             self.current_layout_name = next(iter(self.layouts.keys()), "Universal (All MIDI IDs)")
+
+        self.current_profile_name = self.settings.get("last_profile", "default.json")
+        self.profiles_list = get_available_profiles()
+        if self.current_profile_name not in self.profiles_list and self.profiles_list:
+             self.current_profile_name = self.profiles_list[0]
+        elif not self.profiles_list:
+             self.current_profile_name = "default.json"
+
+        self.key_map, self.cc_map, self.mappings_data = load_profile_data(self.current_profile_name)
 
         self.port_name = port_name
         self.output_port_name = output_port_name
@@ -531,87 +756,177 @@ class App(ctk.CTk):
         self.midi_output = self.open_midi_output()
 
         self.title(localization.get_string('APP_TITLE'))
-        self.geometry("650x600")
+        self.geometry("1100x700") # Увеличил ширину для двух колонок
 
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
-
-        # Переменная для режима Legacy Colors
-        self.legacy_mode_var = ctk.BooleanVar(value=False)
+        self.legacy_mode_var = ctk.BooleanVar(value=self.settings.get("legacy_colors", False))
 
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+        if INPUT_MANAGER.init_error:
+            self.after(100, lambda: self.update_status_label(localization.get_string('STATUS_ERROR', error=INPUT_MANAGER.init_error), is_error=True))
+
+    def save_app_settings(self):
+        self.settings.update({
+            "language": self.language_var.get(),
+            "theme": ctk.get_appearance_mode(),
+            "legacy_colors": self.legacy_mode_var.get(),
+            "last_profile": self.current_profile_name,
+            "last_layout": self.current_layout_name
+        })
+        SettingsManager.save(self.settings)
+
     def get_safe_color(self, color_value):
-        """Возвращает сконвертированный цвет, если включен режим Legacy, иначе оригинал"""
         if self.legacy_mode_var.get():
             return COLOR_TRANSLATION_TABLE.get(color_value, color_value)
         return color_value
 
     def refresh_lights(self):
-        """Принудительно обновляет подсветку (если поток запущен)"""
         if self.listener_thread and self.listener_thread.is_alive():
             self.listener_thread.send_initial_lighting()
+        self.save_app_settings()
 
     def create_widgets(self):
         for widget in self.winfo_children(): widget.destroy()
 
-        top_frame = ctk.CTkFrame(self, fg_color="transparent")
-        top_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
-        ctk.CTkLabel(top_frame, text=localization.get_string('MIDI_MAPPER'), font=("Arial", 20, "bold")).pack(side="left")
+        # --- HEADER (Top) ---
+        header_frame = ctk.CTkFrame(self, height=50, fg_color="transparent")
+        header_frame.pack(fill="x", padx=20, pady=10)
 
-        layout_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
-        layout_frame.pack(side="right", padx=(10, 0))
-        ctk.CTkLabel(layout_frame, text=localization.get_string('LAYOUT_LABEL')).pack(side="left", padx=5)
+        ctk.CTkLabel(header_frame, text=localization.get_string('MIDI_MAPPER'), font=("Arial", 20, "bold")).pack(side="left")
+
+        # Settings Block (Right aligned in Header)
+        settings_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        settings_frame.pack(side="right")
+
+        # Profile
+        ctk.CTkLabel(settings_frame, text=localization.get_string('PROFILE_LABEL')).pack(side="left", padx=5)
+        self.profile_var = ctk.StringVar(value=self.current_profile_name)
+        self.profiles_list = get_available_profiles()
+        profile_options = self.profiles_list + ["---", localization.get_string('PROFILE_NEW')]
+        ctk.CTkOptionMenu(settings_frame, values=profile_options, variable=self.profile_var, command=self.change_profile, width=150).pack(side="left")
+
+        # Layout
+        ctk.CTkLabel(settings_frame, text=localization.get_string('LAYOUT_LABEL')).pack(side="left", padx=(15, 5))
         self.layout_var = ctk.StringVar(value=self.current_layout_name)
-        layout_menu = ctk.CTkOptionMenu(layout_frame, values=list(self.layouts.keys()),
-                                        variable=self.layout_var, command=self.change_layout)
-        layout_menu.pack(side="left")
+        ctk.CTkOptionMenu(settings_frame, values=list(self.layouts.keys()), variable=self.layout_var, command=self.change_layout, width=150).pack(side="left")
 
-        lang_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
-        lang_frame.pack(side="right")
-        ctk.CTkLabel(lang_frame, text=localization.get_string('LANGUAGE_LABEL')).pack(side="left", padx=5)
-        ctk.CTkOptionMenu(lang_frame, values=self.lang_options, variable=self.language_var).pack(side="left")
+        # --- MAIN CONTENT AREA (2 Columns) ---
+        content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        content_frame.grid_columnconfigure(0, weight=0) # Left column (Pad) fixed width roughly
+        content_frame.grid_columnconfigure(1, weight=1) # Right column (Table) expands
 
-        self.status_label = ctk.CTkLabel(self, text=localization.get_string('STATUS_READY'), fg_color="gray20", corner_radius=5, anchor="w", padx=10)
-        self.status_label.grid(row=1, column=0, sticky="ew", padx=20, pady=5)
+        # LEFT COLUMN: Virtual Pad Visualizer
+        left_frame = ctk.CTkFrame(content_frame, width=400) # Container
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
-        self.mapping_table = MappingTableFrame(self, self.mappings_data)
-        self.mapping_table.grid(row=3, column=0, sticky="nsew", padx=20, pady=5)
+        ctk.CTkLabel(left_frame, text="Active Mapping View", font=("Arial", 14, "bold")).pack(pady=10)
 
-        # Нижняя панель управления
-        ctrl_frame = ctk.CTkFrame(self, fg_color="transparent")
-        ctrl_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=10)
+        pad_scroll = ctk.CTkScrollableFrame(left_frame, fg_color="transparent")
+        pad_scroll.pack(fill="both", expand=True)
 
-        # Кнопка Start/Stop
+        layout_config = self.layouts.get(self.current_layout_name, {})
+        # Create Visualizer Instance
+        self.main_visualizer = VirtualPadVisualizer(
+            pad_scroll,
+            layout_config,
+            btn_size=30 if layout_config.get('type') != 'Universal' else 20
+        )
+        self.main_visualizer.pack(pady=10)
+        self.main_visualizer.update_states(self.mappings_data)
+
+        # RIGHT COLUMN: Mapping Table & Controls
+        right_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        right_frame.grid(row=0, column=1, sticky="nsew")
+        right_frame.grid_rowconfigure(1, weight=1) # Table expands
+
+        # Status Bar
+        self.status_label = ctk.CTkLabel(right_frame, text=localization.get_string('STATUS_READY'), fg_color="gray20", corner_radius=5, anchor="w", padx=10)
+        self.status_label.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+
+        # Table
+        # --- ИСПРАВЛЕНИЕ ЗДЕСЬ: Передаем 'self' (это App) как app_instance ---
+        self.mapping_table = MappingTableFrame(right_frame, self, self.mappings_data)
+        self.mapping_table.grid(row=1, column=0, sticky="nsew")
+
+        # Bottom Controls
+        ctrl_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
+        ctrl_frame.grid(row=2, column=0, sticky="ew", pady=10)
+
+        # Start/Stop Button
         start_text = localization.get_string('START_BTN')
         fg_color = "green"
         if self.listener_thread and self.listener_thread.is_alive():
             start_text = localization.get_string('STOP_BTN')
             fg_color = "red"
-        self.toggle_btn = ctk.CTkButton(ctrl_frame, text=start_text, command=self.toggle_listener, fg_color=fg_color)
-        self.toggle_btn.pack(side="left", fill="x", expand=True, padx=5)
+        state = "normal" if not INPUT_MANAGER.init_error else "disabled"
 
-        # Настройки справа внизу
-        right_ctrl = ctk.CTkFrame(ctrl_frame, fg_color="transparent")
-        right_ctrl.pack(side="right")
+        self.toggle_btn = ctk.CTkButton(ctrl_frame, text=start_text, command=self.toggle_listener, fg_color=fg_color, state=state, height=40)
+        self.toggle_btn.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-        # Переключатель Legacy Colors
-        legacy_txt = localization.get_string('LEGACY_COLORS_LABEL', default="Legacy Colors")
-        self.legacy_switch = ctk.CTkSwitch(right_ctrl, text=legacy_txt, variable=self.legacy_mode_var, command=self.refresh_lights)
+        # Misc Options
+        misc_frame = ctk.CTkFrame(ctrl_frame, fg_color="transparent")
+        misc_frame.pack(side="right")
+
+        self.legacy_switch = ctk.CTkSwitch(misc_frame, text=localization.get_string('LEGACY_COLORS_LABEL'), variable=self.legacy_mode_var, command=self.refresh_lights)
         self.legacy_switch.pack(side="left", padx=10)
 
-        ctk.CTkButton(right_ctrl, text=localization.get_string('THEME_BTN'), width=50, command=self.toggle_theme).pack(side="left")
+        ctk.CTkButton(misc_frame, text=localization.get_string('THEME_BTN'), width=60, command=self.toggle_theme).pack(side="left", padx=5)
+
+        ctk.CTkOptionMenu(misc_frame, values=self.lang_options, variable=self.language_var, width=70).pack(side="left")
+
 
     def change_language(self, *args):
         new_lang = self.language_var.get()
         if localization.set_language(new_lang):
+            self.save_app_settings()
             self.create_widgets()
-            self.update_status_label(localization.get_string('STATUS_READY'))
 
     def change_layout(self, choice):
         self.current_layout_name = choice
-        self.update_status_label(localization.get_string('LAYOUT_LABEL') + f" {choice}")
+        self.save_app_settings()
+        self.create_widgets() # Rebuild to update visualizer
+
+    def create_new_profile(self):
+        dialog = ctk.CTkInputDialog(text=localization.get_string('PROFILE_NEW_PROMPT'), title=localization.get_string('PROFILE_NEW'))
+        new_name = dialog.get_input()
+        if new_name:
+            filename = f"{new_name.strip().replace(' ', '_').replace('.json', '')}.json"
+            if filename in self.profiles_list:
+                self.update_status_label(localization.get_string('STATUS_PROFILE_EXISTS'), is_error=True)
+                return
+            new_path = os.path.join(PROFILES_DIR, filename)
+            try:
+                with open(new_path, 'w', encoding='utf-8') as f:
+                    json.dump({"mappings": []}, f, indent=4)
+                self.current_profile_name = filename
+                self.profiles_list = get_available_profiles()
+                self.change_profile(filename, is_new=True)
+            except Exception as e:
+                self.update_status_label(localization.get_string('STATUS_ERROR', error=f"New profile save failed: {e}"), is_error=True)
+
+    def change_profile(self, choice, is_new=False):
+        if choice == localization.get_string('PROFILE_NEW'):
+            self.create_new_profile()
+            return
+        if choice == "---" or choice == self.current_profile_name:
+            self.profile_var.set(self.current_profile_name)
+            return
+
+        self.current_profile_name = choice
+        self.save_app_settings()
+        self.key_map, self.cc_map, self.mappings_data = load_profile_data(self.current_profile_name)
+
+        # Update Table and Visualizer only
+        self.mapping_table.refresh_table(self.mappings_data)
+        self.main_visualizer.update_states(self.mappings_data)
+        self.profile_var.set(self.current_profile_name)
+
+        status_msg = f"Profile loaded: {choice}" if not is_new else f"Profile created: {choice}"
+        self.update_status_label(status_msg)
+        if self.listener_thread and self.listener_thread.is_alive():
+             self.refresh_lights()
 
     def open_midi_output(self):
         try: return open_output(self.output_port_name) if self.output_port_name else None
@@ -625,7 +940,8 @@ class App(ctk.CTk):
         self.open_edit_window(len(self.mappings_data) - 1)
 
     def open_edit_window(self, index):
-        EditMappingWindow(self, self.mappings_data[index], index, self.layouts[self.current_layout_name])
+        current_layout = self.layouts.get(self.current_layout_name, {})
+        EditMappingWindow(self, self.mappings_data[index], index, current_layout)
 
     def delete_mapping(self, index):
         del self.mappings_data[index]
@@ -633,8 +949,9 @@ class App(ctk.CTk):
 
     def update_mappings(self):
         self.mappings_data = [m for m in self.mappings_data if m['id'] != 'NEW']
-        save_config(self.mappings_data)
+        save_profile_data(self.mappings_data, self.current_profile_name)
         self.mapping_table.refresh_table(self.mappings_data)
+        self.main_visualizer.update_states(self.mappings_data)
 
         self.key_map = {}
         self.cc_map = {}
@@ -644,9 +961,13 @@ class App(ctk.CTk):
                 keys = []
                 for k in m['keys_str']:
                     if k in constants.KEY_MAPPINGS: keys.append(constants.KEY_MAPPINGS[k])
-                    elif len(k)==1:
-                        try: keys.append(getattr(uinput, f'KEY_{k.upper()}'))
+                    elif len(k)==1 and UINPUT_AVAILABLE:
+                        try:
+                            attr = f'KEY_{k.upper()}'
+                            if hasattr(uinput, attr):
+                                keys.append(getattr(uinput, attr))
                         except: pass
+
                 entry = {'keys': keys, 'color': m['color']}
                 if m['type'] == 'note': self.key_map[midi_id] = entry
                 elif m['type'] == 'cc': self.cc_map[midi_id] = entry
@@ -663,6 +984,10 @@ class App(ctk.CTk):
         return False
 
     def toggle_listener(self):
+        if INPUT_MANAGER.init_error:
+             self.update_status_label(f"❌ Cannot Start: {INPUT_MANAGER.init_error}", is_error=True)
+             return
+
         if not self.listener_thread or not self.listener_thread.is_alive():
             self.listener_thread = MidiListenerThread(self, self.port_name)
             self.listener_thread.start()
@@ -681,29 +1006,33 @@ class App(ctk.CTk):
                         if m['type'] == 'note': self.midi_output.send(Message('note_on', note=mid_id, velocity=0))
                         elif m['type'] == 'cc': self.midi_output.send(Message('control_change', control=mid_id, value=0))
                     except (ValueError, TypeError): pass
-            except Exception as e: print(f"Ошибка при очистке: {e}")
+            except Exception as e: print(f"Clear Error: {e}")
 
-    def update_status_label(self, text):
-        self.status_label.configure(text=text)
+    def update_status_label(self, text, is_error=False):
+        color = "firebrick" if is_error else "gray20"
+        self.status_label.configure(text=text, fg_color=color)
 
     def toggle_theme(self):
-        ctk.set_appearance_mode("Light" if ctk.get_appearance_mode()=="Dark" else "Dark")
+        curr = ctk.get_appearance_mode()
+        new_theme = "Light" if curr=="Dark" else "Dark"
+        ctk.set_appearance_mode(new_theme)
+        self.save_app_settings()
+        self.create_widgets()
 
     def on_closing(self):
+        self.save_app_settings()
         self.clear_launchpad()
         if self.listener_thread: self.listener_thread.stop()
         if self.midi_output: self.midi_output.close()
         self.destroy()
 
 if __name__ == "__main__":
-    ctk.set_appearance_mode("Dark")
     ins = get_input_names()
     outs = get_output_names()
-    if not ins:
-        print(localization.get_string("STATUS_ERROR", error="Нет MIDI устройств!"))
-        sys.exit()
-    in_port = next((n for n in ins if "launchpad" in n.lower()), ins[0])
+    in_port = next((n for n in ins if "launchpad" in n.lower()), None)
     out_port = next((n for n in outs if "launchpad" in n.lower()), None)
+    if not in_port and ins: in_port = ins[0]
+    if not out_port and outs: out_port = outs[0]
 
     app = App(in_port, out_port)
     app.mainloop()
