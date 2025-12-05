@@ -4,6 +4,7 @@ import glob
 import time
 import json
 import threading
+import re  # Добавлено для парсинга пауз
 import tkinter as tk
 import customtkinter as ctk
 
@@ -44,6 +45,11 @@ except OSError as e:
     UINPUT_ERROR = f"OSError: {e}"
 except Exception as e:
     UINPUT_ERROR = f"Unknown Error: {e}"
+
+if UINPUT_AVAILABLE:
+    if not hasattr(uinput, "EV_KEY"):
+        # 1 — значение EV_KEY в Linux input-event-codes.h
+        setattr(uinput, "EV_KEY", 1)
 
 import localization
 import constants
@@ -154,27 +160,35 @@ def load_profile_data(filename):
         m_id = mapping.get('id')
         m_keys_str = mapping.get('keys', [])
         m_color = mapping.get('color', 0)
+        m_mode = mapping.get('mode', 'One-Shot') # Default mode
 
-        keys_to_press = []
-        # Простая обработка (будет расширена для пауз/мыши позже)
+        # Парсинг клавиш для исполнителя макросов
+        # Теперь мы сохраняем сырые строки для пауз ({WAIT:X}), а клавиши преобразуем
+        parsed_sequence = []
         for key_str in m_keys_str:
-            if key_str in constants.KEY_MAPPINGS:
-                keys_to_press.append(constants.KEY_MAPPINGS[key_str])
+            # Проверка на паузу
+            if key_str.startswith("{WAIT:") and key_str.endswith("}"):
+                parsed_sequence.append(key_str) # Сохраняем как команду
+            elif key_str in constants.KEY_MAPPINGS:
+                parsed_sequence.append(constants.KEY_MAPPINGS[key_str])
             elif len(key_str) == 1 and (key_str.isalpha() or key_str.isdigit()):
                 try:
                     attr_name = f'KEY_{key_str.upper()}'
                     if UINPUT_AVAILABLE and hasattr(uinput, attr_name):
-                        keys_to_press.append(getattr(uinput, attr_name))
+                        parsed_sequence.append(getattr(uinput, attr_name))
                 except (AttributeError, NameError):
                     pass
 
         entry = {
             'type': m_type, 'id': m_id, 'keys_str': m_keys_str,
-            'description': mapping.get('description', '—'), 'color': m_color
+            'description': mapping.get('description', '—'),
+            'color': m_color,
+            'mode': m_mode
         }
         all_mappings_data.append(entry)
 
-        mapping_dict = {'keys': keys_to_press, 'color': m_color}
+        # Словарь для быстрого поиска в потоке
+        mapping_dict = {'keys': parsed_sequence, 'color': m_color, 'mode': m_mode}
         try:
             clean_id = int(m_id)
             if m_type == 'note': key_map[clean_id] = mapping_dict
@@ -192,8 +206,12 @@ def save_profile_data(mappings_data, filename):
         try: m_id = int(m_id)
         except ValueError: pass
         data_to_save['mappings'].append({
-            'type': mapping['type'], 'id': m_id, 'keys': mapping['keys_str'],
-            'description': mapping['description'], 'color': mapping.get('color', 0)
+            'type': mapping['type'],
+            'id': m_id,
+            'keys': mapping['keys_str'],
+            'description': mapping['description'],
+            'color': mapping.get('color', 0),
+            'mode': mapping.get('mode', 'One-Shot')
         })
     try:
         with open(path, 'w', encoding='utf-8') as f:
@@ -203,7 +221,7 @@ def save_profile_data(mappings_data, filename):
         print(f"❌ Error saving profile: {e}")
         return False
 
-# --- 3. INPUT MANAGER ---
+# --- 3. INPUT MANAGER & MACRO EXECUTOR ---
 class InputManager:
     def __init__(self):
         self.device = None
@@ -219,7 +237,7 @@ class InputManager:
             if hasattr(uinput, attr_name):
                 all_keys.add(getattr(uinput, attr_name))
 
-        # 2. Mouse Buttons & Axes (Подготовка для будущих задач)
+        # 2. Mouse Buttons & Axes
         try:
             mouse_capabilities = [
                 uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE,
@@ -228,7 +246,7 @@ class InputManager:
             for cap in mouse_capabilities:
                 all_keys.add(cap)
         except AttributeError:
-            pass # Если старая версия uinput
+            pass
 
         final_key_list = list(all_keys)
         if not final_key_list:
@@ -250,30 +268,207 @@ class InputManager:
             self.init_error = str(e)
 
     def key_down(self, keys):
-        if not self.device or not keys: return
+        if not self.device or not keys:
+            return
         try:
-            for key in keys: self.device.emit(key, 1, syn=False)
-            self.device.syn()
-        except OSError: pass
+            for key in keys:
+                if isinstance(key, int):
+                    try:
+                        # Предпочитаемый формат для твоей сборки (tuple event)
+                        self.device.emit((uinput.EV_KEY, key), 1)
+                    except Exception:
+                        # Fallback: некоторые версии ожидают (code, value)
+                        self.device.emit(key, 1)
+            print(f"[UINPUT] DOWN {keys}")
+        except Exception as e:
+            print("[UINPUT] ERROR key_down:", e)
 
     def key_up(self, keys):
-        if not self.device or not keys: return
+        if not self.device or not keys:
+            return
         try:
-            for key in keys: self.device.emit(key, 0, syn=False)
-            self.device.syn()
-        except OSError: pass
+            for key in keys:
+                if isinstance(key, int):
+                    try:
+                        self.device.emit((uinput.EV_KEY, key), 0)
+                    except Exception:
+                        self.device.emit(key, 0)
+            print(f"[UINPUT] UP {keys}")
+        except Exception as e:
+            print("[UINPUT] ERROR key_up:", e)
 
     def send_keystroke(self, keys):
-        if not self.device: return
-        self.key_down(keys)
-        time.sleep(0.01)
-        self.key_up(keys)
-        # print(f"-> Typed: {keys}")
+        if not self.device:
+            return
+        real = [k for k in keys if isinstance(k, int)]
+        if not real:
+            return
+        self.key_down(real)
+        time.sleep(0.015)
+        self.key_up(real)
 
 INPUT_MANAGER = InputManager()
-key_down = INPUT_MANAGER.key_down
-key_up = INPUT_MANAGER.key_up
-send_keystroke = INPUT_MANAGER.send_keystroke
+
+class MacroExecutor:
+    """
+    Класс для обработки сложной логики макросов: задержки, циклы, удержания.
+    """
+    def __init__(self, input_manager):
+        self.im = input_manager
+        self.active_loops = {}   # {id: stop_event}
+        self.active_toggles = {} # {id: bool_state} (True = Held down)
+        self.threads = {}        # {id: thread}
+
+    def execute(self, mapping_id, mapping_data, is_note_on):
+        mode = mapping_data.get('mode', 'One-Shot')
+        keys = mapping_data.get('keys', [])
+
+        if not keys:
+            return
+
+        # --- Helper: convert items to uinput codes ---
+        def _resolve_key_list(raw_keys):
+            resolved = []
+            for item in raw_keys:
+
+                # 1. WAIT
+                if isinstance(item, str) and item.startswith("{WAIT:"):
+                    resolved.append(item)
+                    continue
+
+                # 2. New format — Key.xxx
+                if isinstance(item, str) and item in constants.KEY_MAPPINGS:
+                    resolved.append(constants.KEY_MAPPINGS[item])
+                    continue
+
+                # 3. Old tuple format (1, 108)
+                if isinstance(item, tuple) and len(item) == 2:
+                    code = item[1]
+                    if isinstance(code, int):
+                        resolved.append(code)
+                        continue
+
+                # 4. Already integer
+                if isinstance(item, int):
+                    resolved.append(item)
+                    continue
+
+                # 5. Numeric string
+                if isinstance(item, str) and item.isdigit():
+                    resolved.append(int(item))
+                    continue
+
+                # 6. KEY_SOMETHING
+                if isinstance(item, str) and item.startswith("KEY_"):
+                    if hasattr(uinput, item):
+                        resolved.append(getattr(uinput, item))
+                        continue
+
+                # 7. 'a' / 'b' / '1'
+                if isinstance(item, str) and len(item) == 1:
+                    keyname = f"KEY_{item.upper()}"
+                    if hasattr(uinput, keyname):
+                        resolved.append(getattr(uinput, keyname))
+                        continue
+
+                # 8. ENTER / TAB etc
+                if isinstance(item, str):
+                    keyname = f"KEY_{item.upper()}"
+                    if hasattr(uinput, keyname):
+                        resolved.append(getattr(uinput, keyname))
+                        continue
+
+                print(f"[WARN] Unrecognized key '{item}'")
+
+            return resolved     # ← ВОТ ТЕПЕРЬ НА СВОЁМ МЕСТЕ!
+
+        # --- Now convert ---
+        resolved_keys = _resolve_key_list(keys)
+        print(f"[EXECUTE] id={mapping_id}, mode={mode}, is_on={is_note_on}, resolved={resolved_keys}")
+
+        if not resolved_keys:
+            return
+
+        # --- MODES ---
+        if mode == 'One-Shot':
+            if is_note_on:
+                threading.Thread(target=self._run_sequence, args=(resolved_keys,)).start()
+
+        elif mode == 'Loop':
+            if is_note_on:
+                # Restart loop if exists
+                if mapping_id in self.active_loops:
+                    self.active_loops[mapping_id].set()
+
+                stop_event = threading.Event()
+                self.active_loops[mapping_id] = stop_event
+                t = threading.Thread(target=self._run_loop, args=(resolved_keys, stop_event))
+                t.start()
+            else:
+                if mapping_id in self.active_loops:
+                    self.active_loops[mapping_id].set()
+                    del self.active_loops[mapping_id]
+
+        elif mode == 'Toggle (Hold)':
+            if is_note_on:
+                held = self.active_toggles.get(mapping_id, False)
+                if not held:
+                    self.im.key_down([k for k in resolved_keys if isinstance(k, int)])
+                    self.active_toggles[mapping_id] = True
+                else:
+                    self.im.key_up([k for k in resolved_keys if isinstance(k, int)])
+                    self.active_toggles[mapping_id] = False
+
+
+    def _run_sequence(self, keys):
+        """Выполняет последовательность один раз с учётом пауз.
+        Ожидается, что `keys` уже содержит int (uinput-коды) и/или строковые команды {WAIT:X}.
+        """
+        current_chord = []
+
+        for item in keys:
+            # Команда паузы: перед паузой отправляем накопленный аккорд (если есть)
+            if isinstance(item, str) and item.startswith("{WAIT:"):
+                if current_chord:
+                    # Отправляем текущий аккорд (список int)
+                    self.im.send_keystroke(current_chord)
+                    current_chord = []
+
+                # Парсим число и ждём нужное время
+                try:
+                    val = float(re.search(r"[\d\.]+", item).group())
+                    time.sleep(val)
+                except Exception:
+                    # если парсинг упал — просто пропускаем
+                    pass
+
+            # Если пришёл int (uinput-код) — добавляем в текущий аккорд
+            elif isinstance(item, int):
+                current_chord.append(item)
+
+            # Защитная ветка: иногда ключи могут быть строками-числами
+            elif isinstance(item, str) and item.isdigit():
+                try:
+                    current_chord.append(int(item))
+                except:
+                    pass
+
+            # Игнорируем остальные неподдерживаемые типы/строки
+
+        # После цикла — отсылаем остаток (если есть)
+        if current_chord:
+            self.im.send_keystroke(current_chord)
+
+    def _run_loop(self, keys, stop_event):
+        """Выполняет цикл пока не установлен stop_event"""
+        while not stop_event.is_set():
+            self._run_sequence(keys)
+            # Небольшая пауза между итерациями, если в макросе нет своих пауз, чтобы не спамить CPU
+            if not any(isinstance(k, str) and "WAIT" in k for k in keys):
+                time.sleep(0.05)
+
+MACRO_EXECUTOR = MacroExecutor(INPUT_MANAGER)
+
 
 # --- 4. MIDI THREAD ---
 class MidiListenerThread(threading.Thread):
@@ -299,22 +494,42 @@ class MidiListenerThread(threading.Thread):
                 self.app.update_status_label(localization.get_string('STATUS_LISTENING', port_name=self.port_name))
 
                 while not self._stop_event.is_set():
-                    msg = port.receive(block=False)
-                    if msg:
+                    # Обрабатываем все ожидающие сообщения (более надёжно, чем receive(block=False))
+                    processed_any = False
+                    for msg in port.iter_pending():
+                        processed_any = True
+                        # NOTE EVENTS
                         if msg.type == 'note_on' or msg.type == 'note_off':
-                            id_val = msg.note
-                            keys_data = self.app.key_map.get(id_val)
+                            raw_id = msg.note
+                            # сначала ищем строковый ключ (как в config.json), затем — целочисленный запасной вариант
+                            id_str = str(raw_id)
+                            keys_data = self.app.key_map.get(id_str)
+                            if keys_data is None:
+                                keys_data = self.app.key_map.get(raw_id)
+
                             if keys_data:
-                                if msg.type == 'note_on' and msg.velocity > 0:
-                                    key_down(keys_data['keys'])
-                                elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
-                                    key_up(keys_data['keys'])
-                        elif msg.type == 'control_change' and msg.value > 0:
-                            id_val = msg.control
-                            if id_val in self.app.cc_map:
-                                send_keystroke(self.app.cc_map[id_val]['keys'])
-                    else:
+                                is_on = (msg.type == 'note_on' and getattr(msg, 'velocity', 0) > 0)
+                                # краткий debug в консоль — можно убрать после отладки
+                                print(f"[MIDI] note {raw_id} -> mapping found, is_on={is_on}")
+                                MACRO_EXECUTOR.execute(id_str if id_str in self.app.key_map else raw_id, keys_data, is_on)
+
+                        # CC EVENTS
+                        elif msg.type == 'control_change':
+                            raw_id = msg.control
+                            id_str = str(raw_id)
+                            keys_data = self.app.cc_map.get(id_str)
+                            if keys_data is None:
+                                keys_data = self.app.cc_map.get(raw_id)
+
+                            if keys_data:
+                                is_on = (getattr(msg, 'value', 0) > 0)
+                                print(f"[MIDI] cc {raw_id} -> mapping found, is_on={is_on}")
+                                MACRO_EXECUTOR.execute(id_str if id_str in self.app.cc_map else raw_id, keys_data, is_on)
+
+                    # Если ничего не было, даём небольшой отдых
+                    if not processed_any:
                         time.sleep(0.005)
+
             self.app.update_status_label(localization.get_string('STATUS_STOPPED'))
         except Exception as e:
             self.app.update_status_label(localization.get_string('STATUS_ERROR', error=str(e)), is_error=True)
@@ -335,44 +550,46 @@ class MidiListenerThread(threading.Thread):
 class VirtualPadVisualizer(ctk.CTkFrame):
     """
     Универсальный виджет для отображения Launchpad.
-    Используется и в главном окне (просмотр), и в редакторе (выбор).
+    ИСПРАВЛЕНИЯ: Квадратные кнопки, отсутствие растягивания текста.
     """
-    def __init__(self, master, layout_config, button_callback=None, btn_size=30, **kwargs):
+    def __init__(self, master, layout_config, button_callback=None, btn_size=40, **kwargs):
         super().__init__(master, **kwargs)
         self.layout_config = layout_config
         self.button_callback = button_callback
         self.btn_size = btn_size
-        self.buttons = {} # (type, id) -> Button
+        self.buttons = {}
 
         self.render()
 
     def render(self):
-        # Очистка
         for widget in self.winfo_children(): widget.destroy()
         self.buttons = {}
 
         layout_type = self.layout_config.get("type", "Mini")
 
-        # Настройка равномерной сетки, чтобы колонки не "плавали"
-        if layout_type == "Universal":
-            cols = 16
-        elif layout_type == "Pro":
-            cols = 10
-        else: # Mini
-            cols = 9
+        # Настройка сетки: не используем uniform, чтобы контролировать размер вручную
+        # или используем frame-контейнер для центрирования
 
-        # uniform="cols" гарантирует одинаковую ширину для всех колонок
-        for i in range(cols):
-            self.grid_columnconfigure(i, weight=1, uniform="cols")
+        # Основной контейнер сетки (центрируем его внутри self)
+        grid_frame = ctk.CTkFrame(self, fg_color="transparent")
+        grid_frame.pack(anchor="center")
 
-        # Хелпер для создания кнопки
         def add_btn(row, col, label, m_type, m_id, radius, is_side=False):
-            # Цвет по умолчанию
-            default_color = "gray30"
-            if is_side: default_color = "gray20"
+            default_color = MAIN_GRID_COLOR
+            if is_side:
+                default_color = SIDE_GRID_COLOR
+
+            # Создаем фрейм-обертку, чтобы задать жесткий размер
+            # CTkButton имеет баг/особенность, где текст может расширять кнопку.
+            container = ctk.CTkFrame(grid_frame, width=self.btn_size, height=self.btn_size, fg_color="transparent")
+            container.grid_propagate(False) # Запрещаем менять размер от содержимого
+            container.grid(row=row, column=col, padx=1, pady=1)
 
             btn = ctk.CTkButton(
-                self, text=label, width=self.btn_size, height=self.btn_size,
+                container,
+                text=label,
+                width=self.btn_size,
+                height=self.btn_size,
                 corner_radius=radius,
                 fg_color=default_color,
                 font=("Arial", 9),
@@ -384,23 +601,26 @@ class VirtualPadVisualizer(ctk.CTkFrame):
             else:
                 btn.configure(state="disabled", text_color_disabled="white")
 
-            btn.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+            # Размещаем кнопку внутри жесткого контейнера.
+            # sticky="" (по умолчанию) центрирует её.
+            btn.place(relx=0.5, rely=0.5, anchor="center", relwidth=1, relheight=1)
+
             self.buttons[(m_type, m_id)] = btn
 
-        # --- ОТРИСОВКА В ЗАВИСИМОСТИ ОТ ЛЕЙАУТА ---
-        ROUND_RADIUS = self.btn_size // 2
         SQUARE_RADIUS = 4
+        ROUND_RADIUS = SQUARE_RADIUS
+
+        MAIN_GRID_COLOR = "gray30"
+        SIDE_GRID_COLOR = "gray28"
 
         if layout_type == "Mini":
             cc_start = self.layout_config.get("cc_row_start", 104)
             cc_end = self.layout_config.get("cc_row_end", 111)
             side_notes = self.layout_config.get("side_notes", [])
 
-            # Top CC Row
             for idx, cc_id in enumerate(range(cc_start, cc_end + 1)):
                 add_btn(0, idx, f"{cc_id}", 'cc', cc_id, ROUND_RADIUS)
 
-            # Grid 8x8 + Side
             for r in range(8):
                 for c in range(8):
                     note_id = r * 16 + c
@@ -420,14 +640,11 @@ class VirtualPadVisualizer(ctk.CTkFrame):
                  add_btn(0, c+1, f"{n_id}", 'note', n_id, ROUND_RADIUS)
 
              for r in range(8):
-                 # Left
                  if r < len(left):
                      add_btn(r+1, 0, f"{left[r]}", 'note', left[r], ROUND_RADIUS, is_side=True)
-                 # Center
                  for c in range(8):
                      note_id = grid_start + (7-r) * 10 + c
                      add_btn(r+1, c+1, "", 'note', note_id, SQUARE_RADIUS)
-                 # Right
                  if r < len(right):
                      add_btn(r+1, 9, f"{right[r]}", 'note', right[r], ROUND_RADIUS, is_side=True)
 
@@ -437,44 +654,31 @@ class VirtualPadVisualizer(ctk.CTkFrame):
         elif layout_type == "Universal":
             notes = self.layout_config.get("notes", [])
             ccs = self.layout_config.get("cc", [])
-
-            # CC (2 ряда по 16) - делаем компактнее, если их 128
-            # Но для простоты выводим как есть
-            row = 0
-            col = 0
+            row, col = 0, 0
             for i in ccs:
                 add_btn(row, col, str(i), 'cc', i, ROUND_RADIUS, is_side=True)
                 col += 1
-                if col > 15:
-                    col = 0
-                    row += 1
-
-            # Разделитель
+                if col > 15: col = 0; row += 1
             row += 1
-
-            # Notes
             col = 0
             for i in notes:
                 add_btn(row, col, str(i), 'note', i, SQUARE_RADIUS)
                 col += 1
-                if col > 15:
-                    col = 0
-                    row += 1
+                if col > 15: col = 0; row += 1
 
     def update_states(self, mappings_data, current_selection=None):
-        """
-        Обновляет цвета и текст кнопок на основе маппингов.
-        mappings_data: список словарей маппингов.
-        current_selection: словарь {'type':..., 'id':...} для подсветки редактируемого.
-        """
-        # Сброс цветов
         layout_type = self.layout_config.get("type", "Mini")
         for (m_type, m_id), btn in self.buttons.items():
             base_color = "gray30"
             if m_type == 'cc' or (layout_type == "Mini" and m_id % 16 == 8): base_color = "gray20"
-            btn.configure(fg_color=base_color, text=str(m_id) if (layout_type!="Mini" or m_type=='cc' or m_id%16==8) else "")
 
-        # Применение маппингов (индекс + цвет)
+            # Проверяем, есть ли текст ID, который нужно показать
+            show_text = ""
+            if layout_type != "Mini" or m_type == 'cc' or m_id % 16 == 8:
+                show_text = str(m_id)
+
+            btn.configure(fg_color=base_color, text=show_text)
+
         for idx, m in enumerate(mappings_data):
             if m['id'] == 'NEW': continue
             try:
@@ -482,17 +686,14 @@ class VirtualPadVisualizer(ctk.CTkFrame):
                 mtype = m['type']
                 if (mtype, mid) in self.buttons:
                     btn = self.buttons[(mtype, mid)]
-                    # Отображаем порядковый номер маппинга (idx + 1)
                     btn.configure(text=str(idx + 1), fg_color="teal" if mtype=='note' else "darkorange")
             except: pass
 
-        # Подсветка текущего выделения (для редактора)
         if current_selection:
             cs_id = current_selection.get('id')
             cs_type = current_selection.get('type')
             try: cs_id = int(cs_id)
             except: pass
-
             if (cs_type, cs_id) in self.buttons:
                 self.buttons[(cs_type, cs_id)].configure(fg_color="red")
 
@@ -540,11 +741,10 @@ class EditMappingWindow(ctk.CTkToplevel):
         title_id = mapping_data['id'] if mapping_data['id'] != 'NEW' else localization.get_string('EDIT_NEW_TITLE')
         self.title(localization.get_string('EDIT_TITLE', id=title_id))
 
-        # Адаптивный размер окна редактора
         if layout_config.get('type') == 'Universal':
-            self.geometry("900x800")
+            self.geometry("900x850")
         else:
-            self.geometry("600x750")
+            self.geometry("600x800")
 
         self.mapping_data = mapping_data
         self.index = index
@@ -560,16 +760,24 @@ class EditMappingWindow(ctk.CTkToplevel):
     def open_key_menu(self):
         KeySelectionWindow(self, self.keys_entry)
 
+    def insert_delay(self):
+        current_text = self.keys_entry.get().strip()
+        delay_tag = "{WAIT:0.1}"
+        if current_text and not current_text.endswith("+") and not current_text.endswith(" "):
+            new_text = f"{current_text} + {delay_tag}"
+        else:
+            new_text = f"{current_text}{delay_tag}"
+        self.keys_entry.delete(0, 'end')
+        self.keys_entry.insert(0, new_text)
+
     def map_midi_pad(self, midi_id, midi_type):
         self.type_var.set(midi_type)
         self.id_entry.delete(0, 'end')
         self.id_entry.insert(0, str(midi_id))
-        # Обновляем визуализацию
         self.visualizer.update_states(self.master_app.mappings_data,
                                       current_selection={'type': midi_type, 'id': midi_id})
 
     def create_widgets(self):
-        # Frame for Inputs
         input_frame = ctk.CTkFrame(self, fg_color="transparent")
         input_frame.pack(fill="x", padx=10, pady=10)
         input_frame.grid_columnconfigure(1, weight=1)
@@ -583,13 +791,25 @@ class EditMappingWindow(ctk.CTkToplevel):
         self.id_entry.insert(0, curr_id)
         self.id_entry.grid(row=row, column=1, padx=(100, 0), sticky="w")
 
+        # --- KEYS ROW ---
         row += 1
         ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_KEYS'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
         keys_str = " + ".join(self.mapping_data['keys_str'])
         self.keys_entry = ctk.CTkEntry(input_frame, placeholder_text="Click button ->")
         self.keys_entry.insert(0, keys_str)
         self.keys_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
-        ctk.CTkButton(input_frame, text="⌨️", width=40, command=self.open_key_menu).grid(row=row, column=2, sticky="e")
+
+        # Keys Buttons Frame
+        keys_btn_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        keys_btn_frame.grid(row=row, column=2, sticky="e")
+        ctk.CTkButton(keys_btn_frame, text="⏱️ Delay", width=60, command=self.insert_delay, fg_color="gray40").pack(side="left", padx=2)
+        ctk.CTkButton(keys_btn_frame, text="⌨️", width=40, command=self.open_key_menu).pack(side="left")
+
+        # --- MODE & DESC ---
+        row += 1
+        ctk.CTkLabel(input_frame, text="Mode:", font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
+        self.mode_var = ctk.StringVar(value=self.mapping_data.get('mode', 'One-Shot'))
+        ctk.CTkOptionMenu(input_frame, values=["One-Shot", "Loop", "Toggle (Hold)"], variable=self.mode_var).grid(row=row, column=1, sticky="w", padx=5)
 
         row += 1
         ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_DESC'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
@@ -597,6 +817,7 @@ class EditMappingWindow(ctk.CTkToplevel):
         self.desc_entry.insert(0, self.mapping_data['description'])
         self.desc_entry.grid(row=row, column=1, columnspan=2, sticky="ew", padx=5)
 
+        # --- COLOR ---
         row += 1
         ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_COLOR'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
         color_sub_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
@@ -619,20 +840,16 @@ class EditMappingWindow(ctk.CTkToplevel):
         # Virtual Pad
         ctk.CTkLabel(self, text=localization.get_string('EDIT_VIRTUAL_PAD', layout=self.layout_config.get('type')), font=ctk.CTkFont(weight="bold")).pack(pady=5)
 
-        # Scrollable container for Universal layout support
         pad_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        pad_container.pack(fill="both", expand=True, padx=10)
+        pad_container.pack(fill="both", expand=True, padx=25)
 
-        # Using the new Reusable Visualizer
         self.visualizer = VirtualPadVisualizer(
             pad_container,
             self.layout_config,
             button_callback=self.map_midi_pad,
-            btn_size=35 if self.layout_config.get('type') != 'Universal' else 25 # Smaller for Universal
+            btn_size=50 if self.layout_config.get('type') != 'Universal' else 25
         )
         self.visualizer.pack()
-
-        # Initial visual state
         self.visualizer.update_states(self.master_app.mappings_data, current_selection={'type': self.mapping_data['type'], 'id': self.mapping_data['id']})
 
         # Buttons
@@ -656,6 +873,7 @@ class EditMappingWindow(ctk.CTkToplevel):
 
         new_type = self.type_var.get()
         new_desc = self.desc_entry.get().strip()
+        new_mode = self.mode_var.get()
         new_keys_raw = self.keys_entry.get().strip()
         new_keys_list = [k.strip() for k in new_keys_raw.replace(' ', '').split('+') if k.strip()]
 
@@ -674,7 +892,7 @@ class EditMappingWindow(ctk.CTkToplevel):
 
         self.master_app.mappings_data[self.index].update({
             'id': new_id_val, 'type': new_type, 'keys_str': new_keys_list,
-            'description': new_desc, 'color': new_color
+            'description': new_desc, 'color': new_color, 'mode': new_mode
         })
         self.master_app.update_mappings()
         self.destroy()
@@ -682,7 +900,7 @@ class EditMappingWindow(ctk.CTkToplevel):
 class MappingTableFrame(ctk.CTkScrollableFrame):
     def __init__(self, master, app_instance, mappings_data, **kwargs):
         super().__init__(master, label_text=localization.get_string('MAPPING_LIST_LABEL'), **kwargs)
-        self.app_master = app_instance # <-- Исправлено: теперь это ссылка на App, а не на master frame
+        self.app_master = app_instance
         self.grid_columnconfigure(3, weight=1)
         self.create_widgets(mappings_data)
 
@@ -691,36 +909,38 @@ class MappingTableFrame(ctk.CTkScrollableFrame):
         self.create_widgets(mappings_data)
 
     def create_widgets(self, mappings_data):
-        ctk.CTkButton(self, text=localization.get_string('ADD_MAPPING_BTN'), command=self.app_master.add_new_mapping).grid(row=0, column=0, columnspan=6, sticky="ew", pady=5)
+        ctk.CTkButton(self, text=localization.get_string('ADD_MAPPING_BTN'), command=self.app_master.add_new_mapping).grid(row=0, column=0, columnspan=7, sticky="ew", pady=5)
 
-        # Headers
-        headers = ["#", "MIDI", "Keys", "Desc", "", ""]
+        headers = ["#", "MIDI", "Keys", "Mode", "Desc", "", ""]
         for i, h in enumerate(headers):
             ctk.CTkLabel(self, text=h, font=("Arial", 12, "bold")).grid(row=1, column=i, padx=5, sticky="w")
 
         for i, m in enumerate(mappings_data):
             if m['id'] == 'NEW': continue
             r = i + 2
-            # Index #
             ctk.CTkLabel(self, text=f"{i+1}").grid(row=r, column=0, padx=5)
-
-            # MIDI ID
             ctk.CTkLabel(self, text=f"{m['type'][0].upper()}:{m['id']}").grid(row=r, column=1, padx=5, sticky="w")
 
-            # Keys
-            display_keys = [constants.KEY_DISPLAY_MAPPINGS.get(k, k) for k in m['keys_str']]
+            display_keys = []
+            for k in m['keys_str']:
+                if "WAIT" in k: display_keys.append("🕒")
+                else: display_keys.append(constants.KEY_DISPLAY_MAPPINGS.get(k, k))
+
             key_text = " + ".join(display_keys)
             if len(key_text) > 20: key_text = key_text[:17] + "..."
             ctk.CTkLabel(self, text=key_text).grid(row=r, column=2, padx=5, sticky="w")
 
-            # Description
+            # Mode Label
+            mode_short = m.get('mode', 'One-Shot')
+            if mode_short == "Toggle (Hold)": mode_short = "Toggle"
+            ctk.CTkLabel(self, text=mode_short, text_color="gray70", font=("Arial", 10)).grid(row=r, column=3, padx=5, sticky="w")
+
             desc = m['description']
             if len(desc) > 20: desc = desc[:17] + "..."
-            ctk.CTkLabel(self, text=desc).grid(row=r, column=3, padx=5, sticky="w")
+            ctk.CTkLabel(self, text=desc).grid(row=r, column=4, padx=5, sticky="w")
 
-            # Controls
-            ctk.CTkButton(self, text="✎", width=30, command=lambda x=i: self.app_master.open_edit_window(x)).grid(row=r, column=4, padx=2)
-            ctk.CTkButton(self, text="🗑️", width=30, fg_color="firebrick", command=lambda x=i: self.app_master.delete_mapping(x)).grid(row=r, column=5, padx=2)
+            ctk.CTkButton(self, text="✎", width=30, command=lambda x=i: self.app_master.open_edit_window(x)).grid(row=r, column=5, padx=2)
+            ctk.CTkButton(self, text="🗑️", width=30, fg_color="firebrick", command=lambda x=i: self.app_master.delete_mapping(x)).grid(row=r, column=6, padx=2)
 
 # --- 6. MAIN APP ---
 
@@ -756,9 +976,14 @@ class App(ctk.CTk):
         self.midi_output = self.open_midi_output()
 
         self.title(localization.get_string('APP_TITLE'))
-        self.geometry("1100x700") # Увеличил ширину для двух колонок
+        self.geometry("1100x700")
 
         self.legacy_mode_var = ctk.BooleanVar(value=self.settings.get("legacy_colors", False))
+
+        # --- GRID CONFIGURATION FOR MAIN WINDOW FILL ---
+        self.grid_rowconfigure(0, weight=0) # Header
+        self.grid_rowconfigure(1, weight=1) # Content (Must expand)
+        self.grid_columnconfigure(0, weight=1)
 
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -791,62 +1016,72 @@ class App(ctk.CTk):
 
         # --- HEADER (Top) ---
         header_frame = ctk.CTkFrame(self, height=50, fg_color="transparent")
-        header_frame.pack(fill="x", padx=20, pady=10)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
 
         ctk.CTkLabel(header_frame, text=localization.get_string('MIDI_MAPPER'), font=("Arial", 20, "bold")).pack(side="left")
 
-        # Settings Block (Right aligned in Header)
         settings_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         settings_frame.pack(side="right")
 
-        # Profile
         ctk.CTkLabel(settings_frame, text=localization.get_string('PROFILE_LABEL')).pack(side="left", padx=5)
         self.profile_var = ctk.StringVar(value=self.current_profile_name)
         self.profiles_list = get_available_profiles()
         profile_options = self.profiles_list + ["---", localization.get_string('PROFILE_NEW')]
         ctk.CTkOptionMenu(settings_frame, values=profile_options, variable=self.profile_var, command=self.change_profile, width=150).pack(side="left")
 
-        # Layout
         ctk.CTkLabel(settings_frame, text=localization.get_string('LAYOUT_LABEL')).pack(side="left", padx=(15, 5))
         self.layout_var = ctk.StringVar(value=self.current_layout_name)
         ctk.CTkOptionMenu(settings_frame, values=list(self.layouts.keys()), variable=self.layout_var, command=self.change_layout, width=150).pack(side="left")
 
         # --- MAIN CONTENT AREA (2 Columns) ---
         content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        content_frame.grid_columnconfigure(0, weight=0) # Left column (Pad) fixed width roughly
-        content_frame.grid_columnconfigure(1, weight=1) # Right column (Table) expands
+        content_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+
+        # FIX: Ensure content frame expands correctly
+        content_frame.grid_columnconfigure(0, weight=0) # Left (Pad) - fixed logic
+        content_frame.grid_columnconfigure(1, weight=1) # Right (Table) - expands
+        content_frame.grid_rowconfigure(0, weight=1)    # Vertical expand
 
         # LEFT COLUMN: Virtual Pad Visualizer
-        left_frame = ctk.CTkFrame(content_frame, width=400) # Container
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        # We assume 450px is enough for the pad visualizer
+        left_frame = ctk.CTkFrame(content_frame, width=450)
+        left_frame.grid(row=0, column=0, sticky="nsw", padx=(0, 10))
+        left_frame.grid_propagate(False) # Force width
+        left_frame.grid_rowconfigure(1, weight=1)
+        left_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(left_frame, text="Active Mapping View", font=("Arial", 14, "bold")).pack(pady=10)
+        ctk.CTkLabel(left_frame, text="Active Mapping View", font=("Arial", 14, "bold")).grid(row=0, column=0, pady=10)
 
-        pad_scroll = ctk.CTkScrollableFrame(left_frame, fg_color="transparent")
-        pad_scroll.pack(fill="both", expand=True)
+        # Container for visualizer to center it
+        pad_container = ctk.CTkFrame(left_frame, fg_color="transparent")
+        pad_container.grid(row=1, column=0, sticky="nsew")
+        pad_container.grid_rowconfigure(0, weight=1)
+        pad_container.grid_columnconfigure(0, weight=1)
 
         layout_config = self.layouts.get(self.current_layout_name, {})
-        # Create Visualizer Instance
+
         self.main_visualizer = VirtualPadVisualizer(
-            pad_scroll,
+            pad_container,
             layout_config,
-            btn_size=30 if layout_config.get('type') != 'Universal' else 20
+            btn_size=35 if layout_config.get('type') != 'Universal' else 20
         )
-        self.main_visualizer.pack(pady=10)
+        # Visualizer centers itself via pack(anchor=center) inside render
+        self.main_visualizer.grid(row=0, column=0)
         self.main_visualizer.update_states(self.mappings_data)
 
         # RIGHT COLUMN: Mapping Table & Controls
         right_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
         right_frame.grid(row=0, column=1, sticky="nsew")
-        right_frame.grid_rowconfigure(1, weight=1) # Table expands
+
+        # FIX: Right frame expansion
+        right_frame.grid_rowconfigure(1, weight=1)
+        right_frame.grid_columnconfigure(0, weight=1)
 
         # Status Bar
         self.status_label = ctk.CTkLabel(right_frame, text=localization.get_string('STATUS_READY'), fg_color="gray20", corner_radius=5, anchor="w", padx=10)
         self.status_label.grid(row=0, column=0, sticky="ew", pady=(0, 10))
 
         # Table
-        # --- ИСПРАВЛЕНИЕ ЗДЕСЬ: Передаем 'self' (это App) как app_instance ---
         self.mapping_table = MappingTableFrame(right_frame, self, self.mappings_data)
         self.mapping_table.grid(row=1, column=0, sticky="nsew")
 
@@ -854,7 +1089,6 @@ class App(ctk.CTk):
         ctrl_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
         ctrl_frame.grid(row=2, column=0, sticky="ew", pady=10)
 
-        # Start/Stop Button
         start_text = localization.get_string('START_BTN')
         fg_color = "green"
         if self.listener_thread and self.listener_thread.is_alive():
@@ -865,7 +1099,6 @@ class App(ctk.CTk):
         self.toggle_btn = ctk.CTkButton(ctrl_frame, text=start_text, command=self.toggle_listener, fg_color=fg_color, state=state, height=40)
         self.toggle_btn.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-        # Misc Options
         misc_frame = ctk.CTkFrame(ctrl_frame, fg_color="transparent")
         misc_frame.pack(side="right")
 
@@ -886,7 +1119,7 @@ class App(ctk.CTk):
     def change_layout(self, choice):
         self.current_layout_name = choice
         self.save_app_settings()
-        self.create_widgets() # Rebuild to update visualizer
+        self.create_widgets()
 
     def create_new_profile(self):
         dialog = ctk.CTkInputDialog(text=localization.get_string('PROFILE_NEW_PROMPT'), title=localization.get_string('PROFILE_NEW'))
@@ -918,7 +1151,6 @@ class App(ctk.CTk):
         self.save_app_settings()
         self.key_map, self.cc_map, self.mappings_data = load_profile_data(self.current_profile_name)
 
-        # Update Table and Visualizer only
         self.mapping_table.refresh_table(self.mappings_data)
         self.main_visualizer.update_states(self.mappings_data)
         self.profile_var.set(self.current_profile_name)
@@ -935,7 +1167,7 @@ class App(ctk.CTk):
     def add_new_mapping(self):
         self.mappings_data.append({
             'type': 'note', 'id': 'NEW', 'keys_str': [],
-            'description': localization.get_string('MAPPING_NEW_DESC'), 'color': 3
+            'description': localization.get_string('MAPPING_NEW_DESC'), 'color': 3, 'mode': 'One-Shot'
         })
         self.open_edit_window(len(self.mappings_data) - 1)
 
@@ -955,23 +1187,11 @@ class App(ctk.CTk):
 
         self.key_map = {}
         self.cc_map = {}
-        for m in self.mappings_data:
-            try:
-                midi_id = int(m['id'])
-                keys = []
-                for k in m['keys_str']:
-                    if k in constants.KEY_MAPPINGS: keys.append(constants.KEY_MAPPINGS[k])
-                    elif len(k)==1 and UINPUT_AVAILABLE:
-                        try:
-                            attr = f'KEY_{k.upper()}'
-                            if hasattr(uinput, attr):
-                                keys.append(getattr(uinput, attr))
-                        except: pass
-
-                entry = {'keys': keys, 'color': m['color']}
-                if m['type'] == 'note': self.key_map[midi_id] = entry
-                elif m['type'] == 'cc': self.cc_map[midi_id] = entry
-            except: pass
+        # Перезагружаем через load_profile logic чтобы распарсить паузы корректно
+        # Можно оптимизировать, но так надежнее для единообразия
+        temp_km, temp_ccm, _ = load_profile_data(self.current_profile_name)
+        self.key_map = temp_km
+        self.cc_map = temp_ccm
 
         if self.listener_thread and self.listener_thread.is_alive():
              self.update_status_label(localization.get_string('STATUS_UPDATED'))
