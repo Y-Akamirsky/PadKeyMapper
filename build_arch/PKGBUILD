@@ -1,19 +1,18 @@
 # Maintainer: Yaroslav Akamirsky <akamirsky.yaros@gmail.com>
 pkgname=pad-key-mapper
-pkgver=0.0.1.0
+pkgver=0.0.1.1
 pkgrel=1
-pkgdesc="MIDI to Keystroke Mapper for Launchpad (Python/CustomTkinter)"
-arch=('any')
+pkgdesc="MIDI to Keystroke Mapper for Midi controllers (Python/CustomTkinter)"
+arch=('x86_64')
 url="https://github.com/Y-Akamirsky/PadKey-Mapper"
 license=('GPL3')
 depends=('python' 'tk')
 makedepends=('python-pip' 'python-setuptools' 'gcc' 'make')
 install=pad-key-mapper.install
-source=("pad-key-mapper.install" "PKMICON2.png") # Остальные файлы берем локально или из src
+source=("pad-key-mapper.install" "PR-PKMICON.svg") # Остальные файлы берем локально или из src
 sha256sums=('SKIP' 'SKIP')
 
-# Здесь мы предполагаем, что вы собираете пакет из папки, где лежат исходники.
-# Если вы будете публиковать в AUR, source будет ссылкой на .tar.gz релиз или git repo.
+PKMICON=("PR-PKMICON.svg")
 
 prepare() {
     # Создаем .desktop файл на лету
@@ -23,9 +22,9 @@ Type=Application
 Name=PadKey Mapper
 Comment=Turn your Launchpad into a macro keyboard
 Exec=pad-key-mapper
-Icon=PKMICON2
+Icon=PKMPPR
 Terminal=false
-Categories=Utility;AudioVideo;
+Categories=Utility;AudioVideo
 EOF
 
     # Создаем udev правило на лету
@@ -36,86 +35,36 @@ EOF
 
 package() {
     # 1. Создаем директории
-    install -d "$pkgdir/opt/$pkgname"
-    install -d "$pkgdir/usr/bin"
+    # Устанавливаем файлы проекта в /usr/lib/ (стандартное место для библиотек/данных)
+    install -d "$pkgdir/usr/lib/$pkgname"
     install -d "$pkgdir/usr/share/applications"
     install -d "$pkgdir/usr/lib/udev/rules.d"
 
     # 2. Копируем исходный код Python
-    # ВАЖНО: Убедитесь, что пути ../ соответствуют расположению ваших файлов относительно PKGBUILD
-    # Или просто скопируйте файлы .py и .json в папку src/ рядом с PKGBUILD перед запуском makepkg
+    cd "$srcdir" || exit 1
+    # Копируем PadKeyMapper и папку _internal в /usr/lib/$pkgname/
+    # PadKeyMapper - это твой бинарник без расширения
+    cp -r _internal/ PadKeyMapper "$pkgdir/usr/lib/$pkgname"
 
-    cd "$srcdir" || exit 1 # Переходим в корень проекта (настройте под себя)
-    cp constants.py localization.py main.py layouts.json "$pkgdir/opt/$pkgname/"
+    # 3. Создаем запускающий скрипт в /usr/bin/
+    # Он будет запускать PadKeyMapper из папки /usr/lib/pad-key-mapper/
 
-    # Если config.json нужен как шаблон, копируем его.
-    # Но помните: программа должна создавать его в ~/.config/, а не писать в /opt/
-    if [ -f config.json ]; then
-        cp config.json "$pkgdir/opt/$pkgname/config_default.json"
-    fi
+    # Создаем временный скрипт
+    cat > "$srcdir/$pkgname" <<EOF
+#!/bin/bash
+# Переходим в директорию, где лежат все зависимости и основной бинарник
+PROGRAM_ROOT="/usr/lib/$pkgname"
+cd "\$PROGRAM_ROOT"
+# Запускаем твой бинарник PadKeyMapper (без расширения) с помощью интерпретатора Python
+exec ./PadKeyMapper "\$@"
+EOF
+    chmod +x "$pkgdir/usr/lib/$pkgname/PadKeyMapper"
 
-    # 3. Создаем запускающий скрипт в /usr/bin
-    install -d "$pkgdir/usr/bin"
+    # Устанавливаем скрипт в /usr/bin/ и даем ему права на исполнение
+    install -Dm755 "$srcdir/$pkgname" "$pkgdir/usr/bin/$pkgname"
 
-    # 3a. Определяем RELATIVE путь к site-packages (например, /lib/python3.11/site-packages)
-    local rel_site_packages
-    # Используем `sed` для удаления префикса `/usr`
-    rel_site_packages=$(python -c "import site; print(site.getsitepackages()[0])" | sed 's|^/usr||')
-
-    # 3b. Создаем скрипт с установкой PYTHONPATH
-    echo '#!/bin/bash' > "$pkgdir/usr/bin/$pkgname"
-
-    # 3c. Указываем корневую директорию программы
-    echo "PROGRAM_ROOT=\"/opt/$pkgname\"" >> "$pkgdir/usr/bin/$pkgname"
-
-    # 3d. Экспортируем PYTHONPATH, указывая на папку с зависимостями:
-    # /opt/pad-key-mapper + /lib/pythonX.Y/site-packages
-    echo "export PYTHONPATH=\"\$PROGRAM_ROOT$rel_site_packages\"" >> "$pkgdir/usr/bin/$pkgname"
-
-    # 3e. Запускаем программу
-    echo "cd \"\$PROGRAM_ROOT\" && python main.py" >> "$pkgdir/usr/bin/$pkgname"
-
-    chmod +x "$pkgdir/usr/bin/$pkgname"
-
-    # 4. Устанавливаем .desktop файл и udev правило (из prepare)
-    cd "$srcdir"
+    # 4. Устанавливаем .desktop файл, udev правило и иконку
     install -Dm644 "$srcdir/pad-key-mapper.desktop" "$pkgdir/usr/share/applications/pad-key-mapper.desktop"
     install -Dm644 99-padkey-mapper.rules "$pkgdir/usr/lib/udev/rules.d/99-padkey-mapper.rules"
-# 4a. Устанавливаем иконку в /usr/share/pixmaps/ (стандартное место)
-    # Используем Dm644 для установки файла
-    install -Dm644 "$srcdir/PKMICON2.png" "$pkgdir/usr/share/pixmaps/PKMICON2.png" # <--- ДОБАВЬТЕ ЭТО
-    # 5. Устанавливаем Python-зависимости, которых нет в репах Arch, через pip
-
-    # 5a. Определяем целевую папку. Это будет /opt/pad-key-mapper/lib/pythonX.Y/site-packages
-    local py_version
-    # Получаем версию Python, например, python3.11
-    py_version=$(python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
-
-    # Папка, куда будут установлены зависимости ВНУТРИ нашего пакета.
-    # Эта папка должна совпадать с путем в main.py:
-    local target_dir="$pkgdir/opt/$pkgname/lib/$py_version/site-packages"
-
-    install -d "$target_dir"
-
-    echo "🔨 Установка Python-зависимостей через pip в $target_dir..."
-
-    # Используем customtkinter, python-uinput и mido как цель установки.
-    # Флаг --target теперь указывает на нашу жестко заданную папку.
-    python -m pip install \
-        --target="$target_dir" \
-        --no-cache-dir \
-        --ignore-installed \
-        customtkinter python-uinput mido
-
-    if [ $? -ne 0 ]; then
-        echo "❌ ОШИБКА: Сборка Python-зависимостей завершилась неудачей."
-        return 1
-    fi
-
-    # 6. Создаем запускающий скрипт:
-    # Теперь он максимально прост, т.к. main.py сам ищет зависимости
-    install -d "$pkgdir/usr/bin"
-    echo '#!/bin/bash' > "$pkgdir/usr/bin/$pkgname"
-    echo "cd /opt/$pkgname && python main.py" >> "$pkgdir/usr/bin/$pkgname"
-    chmod +x "$pkgdir/usr/bin/$pkgname"
+    install -Dm644 "$srcdir/$PKMICON" "$pkgdir/usr/share/icons/hicolor/scalable/apps/PKMPPR.svg"
 }

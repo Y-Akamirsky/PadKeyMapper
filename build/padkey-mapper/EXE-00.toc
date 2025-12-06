@@ -63,7 +63,7 @@
  [],
  False,
  False,
- 1764911188,
+ 1765016278,
  [('run',
    '/home/akamirsky/Some-scripts/Python/MIDIHK/venv/lib/python3.13/site-packages/PyInstaller/bootloader/Linux-64bit-intel/run',
    'EXECUTABLE')],

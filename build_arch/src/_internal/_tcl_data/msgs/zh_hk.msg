@@ -1,0 +1,1 @@
+/home/akamirsky/Some-scripts/Python/MIDIHK/dist/PadKeyMapper/_internal/_tcl_data/msgs/zh_hk.msg

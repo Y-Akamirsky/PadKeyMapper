@@ -1,0 +1,1 @@
+/home/akamirsky/Some-scripts/Python/MIDIHK/dist/PadKeyMapper/_internal/mido/messages/specs.py

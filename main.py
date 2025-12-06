@@ -1492,6 +1492,7 @@ class App(ctk.CTk):
             self.hw_feedback_running = False
 
 
+
 if __name__ == "__main__":
     ins = get_input_names()
     outs = get_output_names()

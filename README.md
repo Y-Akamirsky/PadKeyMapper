@@ -4,7 +4,7 @@
 
 **PadKey Mapper** turns your Novation Launchpad (Mini, MK2, X, Pro) into a powerful, customizable macro keyboard for Linux.
 
-![Logo](PKMICON.png)
+![Logo](icons/PKMICON.png)
 
 Map any button on your Launchpad to keyboard shortcuts (Ctrl+C, Ctrl+V, etc), function keys (F1-F12), or media controls using a modern, easy-to-use GUI.
 

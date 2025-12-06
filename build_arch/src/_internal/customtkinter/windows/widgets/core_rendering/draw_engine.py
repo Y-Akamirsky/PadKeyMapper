@@ -1,0 +1,1 @@
+/home/akamirsky/Some-scripts/Python/MIDIHK/dist/PadKeyMapper/_internal/customtkinter/windows/widgets/core_rendering/draw_engine.py

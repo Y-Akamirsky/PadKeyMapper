@@ -1,6 +1,1 @@
-# Разрешить доступ к uinput для группы 'uinput' (или 'input')
 KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", TAG+="uaccess", MODE="0660", GROUP="uinput"
-
-# Опционально: права для доступа к самому Launchpad (обычно Arch делает это сам, но на всякий случай)
-SUBSYSTEM=="usb", ATTRS{idVendor}=="1235", ATTRS{idProduct}=="0002", MODE="0660", GROUP="uinput"
-# (Примечание: Vendor/Product ID для Launchpad лучше уточнить через lsusb, но правило uinput важнее)
