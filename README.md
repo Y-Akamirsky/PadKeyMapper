@@ -8,9 +8,8 @@
 
 Map any button on your Launchpad to keyboard shortcuts (Ctrl+C, Ctrl+V, etc), function keys (F1-F12), or media controls using a modern, easy-to-use GUI.
 
-![Main window Screenshot](docs/screenshots/main_window_0010.png)
-![Edit window Screenshot](docs/screenshots/edit_window_0010.png)
-![Add key window Screenshot](docs/screenshots/add_key_window_0010.png)
+![Main window Screenshot](docs/screenshots/main_edit_window_0011.png)
+![Add key window Screenshot](docs/screenshots/add_key_window_0011.png)
 
 ## ✨ Features
 - **Graphic Interface:** No config files editing needed—assign keys visually.
