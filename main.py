@@ -39,6 +39,10 @@ UINPUT_ERROR = None
 try:
     import uinput
     UINPUT_AVAILABLE = True
+    # PATCH: Убедимся, что константы типов событий существуют
+    if not hasattr(uinput, "EV_KEY"): setattr(uinput, "EV_KEY", 1)
+    if not hasattr(uinput, "EV_REL"): setattr(uinput, "EV_REL", 2) # <--- ДОБАВЛЕНО
+    if not hasattr(uinput, "EV_ABS"): setattr(uinput, "EV_ABS", 3)
 except ImportError as e:
     UINPUT_ERROR = f"ImportError: {e}"
 except OSError as e:
@@ -117,6 +121,7 @@ COLOR_TRANSLATION_TABLE = {
 }
 
 def load_layouts(filename="layouts.json"):
+    # 1. Загрузка встроенных лейаутов
     path = os.path.join(BASE_DIR, filename)
     layouts = {}
     try:
@@ -125,6 +130,20 @@ def load_layouts(filename="layouts.json"):
                 layouts = json.load(f)
     except Exception as e:
         print(f"⚠️ Error loading layouts.json: {e}")
+
+    # 2. Загрузка пользовательских лейаутов (layouts_user.json)
+    # Ищем в папке конфига (CONFIG_DIR определен в начале main.py)
+    user_path = os.path.join(CONFIG_DIR, "layouts_user.json")
+    if os.path.exists(user_path):
+        try:
+            with open(user_path, 'r', encoding='utf-8') as f:
+                user_layouts = json.load(f)
+                # Объединяем (пользовательские перезаписывают или дополняют встроенные)
+                layouts.update(user_layouts)
+                print(f"✅ Loaded user layouts from {user_path}")
+        except Exception as e:
+            print(f"⚠️ Error loading layouts_user.json: {e}")
+
     return layouts
 
 def get_available_profiles():
@@ -239,6 +258,8 @@ class InputManager:
 
         # 2. Mouse Buttons & Axes
         try:
+            # REL_X (0x00) и REL_Y (0x01) численно совпадают с KEY_RESERVED и KEY_ESC.
+            # Важно передать их при инициализации, чтобы uinput включил поддержку относительных осей.
             mouse_capabilities = [
                 uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE,
                 uinput.REL_X, uinput.REL_Y, uinput.REL_WHEEL
@@ -307,6 +328,36 @@ class InputManager:
         time.sleep(0.015)
         self.key_up(real)
 
+    def emit_rel(self, code, value):
+        """Отправляет относительное событие (движение мыши, скролл)."""
+        if not self.device: return
+        try:
+            # ИСПРАВЛЕНИЕ: Используем простой формат (code, value).
+            # python-uinput сам понимает, что это REL событие, если устройство создано с поддержкой REL_*.
+            self.device.emit(code, int(value))
+            print(f"[UINPUT] REL code={code} val={value}")
+        except Exception as e:
+            print(f"[UINPUT] ERROR emit_rel: {e}")
+
+    def send_keystroke(self, keys):
+        if not self.device:
+            return
+
+        # Разделяем обычные клавиши (int) и специальные команды (tuple)
+        simple_keys = []
+
+        for k in keys:
+            if isinstance(k, int):
+                simple_keys.append(k)
+            elif isinstance(k, tuple) and len(k) == 2:
+                # Это событие REL: (code, value)
+                self.emit_rel(k[0], k[1])
+
+        if simple_keys:
+            self.key_down(simple_keys)
+            time.sleep(0.015)
+            self.key_up(simple_keys)
+
 INPUT_MANAGER = InputManager()
 
 class MacroExecutor:
@@ -336,42 +387,70 @@ class MacroExecutor:
                     resolved.append(item)
                     continue
 
-                # 2. New format — Key.xxx
+                # 2. RELATIVE MOUSE: Key.mouse_x{REL:5}
+                # Ищем подстроку {REL:число}. Regex более мягкий.
+                if "{REL:" in item:
+                    # Ищем группу {REL:(-число)}
+                    rel_match = re.search(r"\{REL:(-?\d+)\}", item)
+                    if rel_match:
+                        try:
+                            val = int(rel_match.group(1))
+                            # Имя клавиши — это всё, что до {REL:
+                            key_part = item.split("{REL:")[0].strip()
+
+                            if key_part in constants.KEY_MAPPINGS:
+                                code = constants.KEY_MAPPINGS[key_part]
+                                resolved.append((code, val))
+                                print(f"   -> [PARSER] REL OK: {key_part} -> code {code}, val {val}")
+                                continue
+                            else:
+                                print(f"   -> [PARSER] WARN: Key '{key_part}' not found for REL")
+                        except ValueError:
+                            pass
+
+                if item in constants.KEY_MAPPINGS:
+                    # Если это ось мыши, но БЕЗ тега REL — пропускаем, чтобы не нажать её как кнопку
+                    if item in ['Key.mouse_x', 'Key.mouse_y', 'Key.mouse_wh']:
+                        continue
+                    resolved.append(constants.KEY_MAPPINGS[item])
+                    continue
+
+                # 3. New format — Key.xxx
                 if isinstance(item, str) and item in constants.KEY_MAPPINGS:
                     resolved.append(constants.KEY_MAPPINGS[item])
                     continue
 
-                # 3. Old tuple format (1, 108)
+                # 4. Old tuple format (1, 108)
                 if isinstance(item, tuple) and len(item) == 2:
                     code = item[1]
                     if isinstance(code, int):
                         resolved.append(code)
                         continue
 
-                # 4. Already integer
+                # 5. Already integer
                 if isinstance(item, int):
                     resolved.append(item)
                     continue
 
-                # 5. Numeric string
+                # 6. Numeric string
                 if isinstance(item, str) and item.isdigit():
                     resolved.append(int(item))
                     continue
 
-                # 6. KEY_SOMETHING
+                # 7. KEY_SOMETHING
                 if isinstance(item, str) and item.startswith("KEY_"):
                     if hasattr(uinput, item):
                         resolved.append(getattr(uinput, item))
                         continue
 
-                # 7. 'a' / 'b' / '1'
+                # 8. 'a' / 'b' / '1'
                 if isinstance(item, str) and len(item) == 1:
                     keyname = f"KEY_{item.upper()}"
                     if hasattr(uinput, keyname):
                         resolved.append(getattr(uinput, keyname))
                         continue
 
-                # 8. ENTER / TAB etc
+                # 9. ENTER / TAB etc
                 if isinstance(item, str):
                     keyname = f"KEY_{item.upper()}"
                     if hasattr(uinput, keyname):
@@ -391,21 +470,25 @@ class MacroExecutor:
 
         # --- MODES ---
         if mode == "Common-KB":
+            # Фильтруем: Common-KB не может "удерживать" REL события, только клавиши
+            real_keys = [k for k in resolved_keys if isinstance(k, int)]
             if is_note_on:
-                # физическое удержание реальной клавиши
-                self.im.key_down(resolved_keys)
+                self.im.key_down(real_keys)
+                # REL события срабатывают один раз при нажатии
+                for k in resolved_keys:
+                    if isinstance(k, tuple): self.im.emit_rel(k[0], k[1])
 
-                # можно добавить лёгкую подсветку GUI/HW
                 color = mapping_data.get("color", 15)
-                self.app.start_feedback(mapping_id, color_on="#009900")
-                self.app.start_hw_feedback(mapping_id, color)
-
-            else:  # note_off
-                self.im.key_up(resolved_keys)
-                self.app.stop_feedback(mapping_id)
-                self.app.stop_hw_feedback(mapping_id)
-
+                if self.app:
+                    self.app.start_feedback(mapping_id, color_on="#009900")
+                    self.app.start_hw_feedback(mapping_id, color)
+            else:
+                self.im.key_up(real_keys)
+                if self.app:
+                    self.app.stop_feedback(mapping_id)
+                    self.app.stop_hw_feedback(mapping_id)
             return
+
         if mode == 'One-Shot':
             if is_note_on:
                 threading.Thread(target=self._run_sequence, args=(resolved_keys,)).start()
@@ -428,6 +511,7 @@ class MacroExecutor:
                     self.active_loops[mapping_id].set()
                     del self.active_loops[mapping_id]
                     self.app.stop_feedback(mapping_id)
+                    self.app.stop_hw_feedback(mapping_id)
                     return
 
                 # Иначе — запускаем новую
@@ -448,19 +532,23 @@ class MacroExecutor:
         elif mode == 'Toggle (Hold)':
             if is_note_on:
                 held = self.active_toggles.get(mapping_id, False)
+                real_keys = [k for k in resolved_keys if isinstance(k, int)]
                 if not held:
-                    self.im.key_down([k for k in resolved_keys if isinstance(k, int)])
+                    self.im.key_down(real_keys)
+                    # REL события для тоггла срабатывают при включении
+                    for item in resolved_keys:
+                        if isinstance(item, tuple): self.im.emit_rel(item[0], item[1])
+
                     self.active_toggles[mapping_id] = True
-                    # 🔥 включаем фидбек
-                    self.app.start_feedback(mapping_id)
-                    color = mapping_data.get("color", 15)
-                    self.app.start_hw_feedback(mapping_id, color)
+                    if self.app:
+                        self.app.start_feedback(mapping_id)
+                        self.app.start_hw_feedback(mapping_id, mapping_data.get("color", 15))
                 else:
-                    self.im.key_up([k for k in resolved_keys if isinstance(k, int)])
+                    self.im.key_up(real_keys)
                     self.active_toggles[mapping_id] = False
-                    # 🔥 выключаем
-                    self.app.stop_feedback(mapping_id)
-                    self.app.stop_hw_feedback(mapping_id)
+                    if self.app:
+                        self.app.stop_feedback(mapping_id)
+                        self.app.stop_hw_feedback(mapping_id)
 
 
     def _run_sequence(self, keys):
@@ -484,6 +572,15 @@ class MacroExecutor:
                 except Exception:
                     # если парсинг упал — просто пропускаем
                     pass
+
+            # REL EVENT (tuple: code, val)
+            elif isinstance(item, tuple) and len(item) == 2:
+                # Если у нас накоплен аккорд клавиш, сбрасываем его перед движением мыши
+                if current_chord:
+                    self.im.send_keystroke(current_chord)
+                    current_chord = []
+                # Отправляем движение немедленно
+                self.im.emit_rel(item[0], item[1])
 
             # Если пришёл int (uinput-код) — добавляем в текущий аккорд
             elif isinstance(item, int):
@@ -589,6 +686,54 @@ class MidiListenerThread(threading.Thread):
             except: pass
 
 # --- 5. GUI COMPONENTS ---
+
+def bind_linux_scroll(widget):
+    """
+    Рекурсивно биндит скролл для Linux на виджет и всех его детей.
+    """
+    if not sys.platform.startswith('linux'):
+        return
+
+    # Целевая функция скролла (замыкание на widget)
+    # Находим ближайший scrollable контейнер
+    scroll_target = None
+
+    # Пытаемся найти родительский canvas или scrollframe, к которому относится этот виджет
+    parent = widget
+    while parent:
+        if isinstance(parent, ctk.CTkScrollableFrame):
+            # У CTkScrollableFrame канвас лежит глубже
+            try: scroll_target = parent._parent_canvas
+            except: pass
+            break
+        if isinstance(parent, (tk.Canvas, ctk.CTkCanvas)):
+            scroll_target = parent
+            break
+        parent = parent.master
+
+    if not scroll_target:
+        return
+
+    def _on_scroll_up(event):
+        scroll_target.yview_scroll(-1, "units")
+        return "break" # Предотвращаем стандартную обработку
+
+    def _on_scroll_down(event):
+        scroll_target.yview_scroll(1, "units")
+        return "break"
+
+    # Рекурсивная функция назначения
+    def _recursive_bind(w):
+        # Биндим только если виджет сам не скроллится (например, текстовое поле)
+        if not isinstance(w, (tk.Text, ctk.CTkTextbox, tk.Listbox)):
+            w.bind("<Button-4>", _on_scroll_up, add="+")
+            w.bind("<Button-5>", _on_scroll_down, add="+")
+
+        for child in w.winfo_children():
+            _recursive_bind(child)
+
+    # Запускаем биндинг (можно с небольшой задержкой, чтобы отрисовались дети)
+    widget.after(100, lambda: _recursive_bind(widget))
 
 class VirtualPadVisualizer(ctk.CTkFrame):
     """
@@ -757,6 +902,7 @@ class KeySelectionWindow(ctk.CTkToplevel):
 
         self.scroll_frame = ctk.CTkScrollableFrame(self, label_text=localization.get_string('KEY_SELECT_LABEL'))
         self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        bind_linux_scroll(self.scroll_frame)
 
         sorted_keys = sorted(constants.KEY_MAPPINGS.keys())
         for key_name in sorted_keys:
@@ -892,6 +1038,9 @@ class EditMappingWindow(ctk.CTkToplevel):
         pad_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
         pad_container.pack(fill="both", expand=True, padx=25)
 
+        # FIX SCROLL
+        bind_linux_scroll(pad_container)
+
         self.visualizer = VirtualPadVisualizer(
             pad_container,
             self.layout_config,
@@ -952,6 +1101,7 @@ class MappingTableFrame(ctk.CTkScrollableFrame):
         self.app_master = app_instance
         self.grid_columnconfigure(3, weight=1)
         self.create_widgets(mappings_data)
+        bind_linux_scroll(self)
 
     def refresh_table(self, mappings_data):
         for widget in self.winfo_children(): widget.destroy()

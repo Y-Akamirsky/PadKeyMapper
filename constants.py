@@ -33,6 +33,10 @@ KEY_MAPPINGS = {
     'Key.num_dot': uinput.KEY_KPDOT, 'Key.num_plus': uinput.KEY_KPPLUS,
     'Key.num_min': uinput.KEY_KPMINUS, 'Key.num_eq': uinput.KEY_KPEQUAL,
     'Key.num_comm': uinput.KEY_KPCOMMA, 'Key.num_ast': uinput.KEY_KPASTERISK,
+    # MOUSE
+    'Key.mouse_l': uinput.BTN_LEFT, 'Key.mouse_r': uinput.BTN_RIGHT,
+    'Key.mouse_m': uinput.BTN_MIDDLE, 'Key.mouse_wh': uinput.REL_WHEEL,
+    'Key.mouse_x': uinput.REL_X, 'Key.mouse_y': uinput.REL_Y,
 }
 
 # Карта для отображения читаемых имен клавиш в GUI (ALT вместо Key.alt)
@@ -58,6 +62,10 @@ KEY_DISPLAY_MAPPINGS = {
     'Key.num9': 'NUM 9', 'Key.num_dot': 'NUM .', 'Key.num_plus': 'NUM +',
     'Key.num_min': 'NUM -', 'Key.num_eq': 'NUM =', 'Key.num_comm': 'NUM ,',
     'Key.num_ast': 'NUM *',
+    # MOUSE
+    'Key.mouse_l': 'MOUSE_L', 'Key.mouse_r': 'MOUSE_R',
+    'Key.mouse_m': 'MOUSE_M', 'Key.mouse_wh': 'MOUSE_WHEEL',
+    'Key.mouse_x': 'MOUSE_RELX', 'Key.mouse_y': 'MOUSE_RELY',
 }
 KEY_DISPLAY_MAPPINGS.update({f'Key.f{i}': f'F{i}' for i in range(1, 13)})
 
