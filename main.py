@@ -183,13 +183,22 @@ def load_profile_data(filename):
 
         # Парсинг клавиш для исполнителя макросов
         # Теперь мы сохраняем сырые строки для пауз ({WAIT:X}), а клавиши преобразуем
+        # [FIX] Парсинг клавиш для исполнителя макросов
         parsed_sequence = []
         for key_str in m_keys_str:
-            # Проверка на паузу
+            # 1. Проверка на паузу
             if key_str.startswith("{WAIT:") and key_str.endswith("}"):
-                parsed_sequence.append(key_str) # Сохраняем как команду
+                parsed_sequence.append(key_str)
+
+            # 2. [FIX] Проверка на REL события (пропускаем строку дальше, парсинг будет в MacroExecutor)
+            elif "{REL:" in key_str and "}" in key_str:
+                parsed_sequence.append(key_str)
+
+            # 3. Обычные клавиши из констант
             elif key_str in constants.KEY_MAPPINGS:
                 parsed_sequence.append(constants.KEY_MAPPINGS[key_str])
+
+            # 4. Буквы/цифры
             elif len(key_str) == 1 and (key_str.isalpha() or key_str.isdigit()):
                 try:
                     attr_name = f'KEY_{key_str.upper()}'
@@ -248,25 +257,59 @@ class InputManager:
         if not UINPUT_AVAILABLE or self.init_error: return
 
         all_keys = set()
-        # 1. Keyboard keys
-        for key_code in constants.KEY_MAPPINGS.values():
-            all_keys.add(key_code)
+
+        # Список имен ключей, которые относятся к осям мыши (Relative events)
+        rel_names = ['Key.mouse_x', 'Key.mouse_y', 'Key.mouse_wh']
+
+        # 1. Обработка KEY_MAPPINGS
+        for name, key_val in constants.KEY_MAPPINGS.items():
+            try:
+                # СЦЕНАРИЙ 1: Значение уже кортеж (например, (EV_REL, code))
+                if isinstance(key_val, tuple):
+                    all_keys.add((int(key_val[0]), int(key_val[1])))
+                    continue
+
+                # СЦЕНАРИЙ 2: Значение - число (стандартный uinput)
+                code = int(key_val)
+
+                # Если это ось мыши — регистрируем как EV_REL (кортеж)
+                if name in rel_names:
+                    all_keys.add((uinput.EV_REL, code))
+                else:
+                    # Иначе — как клавишу (EV_KEY) (число)
+                    all_keys.add(code)
+
+            except Exception as e:
+                # Это предупреждение, а не критическая ошибка, можно пропустить проблемные ключи
+                print(f"[INIT WARN] Skipped key {name}: {e}")
+                continue
+
+        # 2. Добавляем буквы/цифры (защищенный код)
         for char in 'abcdefghijklmnopqrstuvwxyz0123456789':
             attr_name = f'KEY_{char.upper()}'
             if hasattr(uinput, attr_name):
-                all_keys.add(getattr(uinput, attr_name))
+                key_code = getattr(uinput, attr_name)
 
-        # 2. Mouse Buttons & Axes
+                if isinstance(key_code, tuple):
+                    # Если это кортеж (EV_TYPE, CODE) - добавляем
+                    all_keys.add((int(key_code[0]), int(key_code[1])))
+                else:
+                    # Если это число - добавляем
+                    all_keys.add(int(key_code))
+
+        # 3. Добавляем кнопки мыши явно (защищенный код)
         try:
-            # REL_X (0x00) и REL_Y (0x01) численно совпадают с KEY_RESERVED и KEY_ESC.
-            # Важно передать их при инициализации, чтобы uinput включил поддержку относительных осей.
-            mouse_capabilities = [
-                uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE,
-                uinput.REL_X, uinput.REL_Y, uinput.REL_WHEEL
-            ]
-            for cap in mouse_capabilities:
-                all_keys.add(cap)
+            mouse_btns = [uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE]
+            for btn in mouse_btns:
+                # ИСПРАВЛЕНИЕ ДЛЯ КНОПОК МЫШИ: Проверяем, является ли код кортежем
+                if isinstance(btn, tuple):
+                    # Если это кортеж (EV_TYPE, CODE) - добавляем
+                    all_keys.add((int(btn[0]), int(btn[1])))
+                else:
+                    # Если это число - добавляем
+                    all_keys.add(int(btn))
         except AttributeError:
+            # Возможно, нет поддержки кнопок мыши
             pass
 
         final_key_list = list(all_keys)
@@ -275,8 +318,9 @@ class InputManager:
             return
 
         try:
+            # Создание устройства
             self.device = uinput.Device(final_key_list)
-            print(f"✅ uinput device created.")
+            print(f"✅ uinput device created. Capabilities: {len(final_key_list)}")
         except OSError as e:
             error_message = str(e)
             if "No such device" in error_message or "Errno 19" in error_message:
@@ -293,13 +337,13 @@ class InputManager:
             return
         try:
             for key in keys:
-                if isinstance(key, int):
-                    try:
-                        # Предпочитаемый формат для твоей сборки (tuple event)
-                        self.device.emit((uinput.EV_KEY, key), 1)
-                    except Exception:
-                        # Fallback: некоторые версии ожидают (code, value)
-                        self.device.emit(key, 1)
+                # Если приходит кортеж (тип, код) — используем его
+                if isinstance(key, tuple):
+                    self.device.emit(key, 1)
+                # Если int — это клавиша
+                elif isinstance(key, int):
+                    # Явно отправляем как EV_KEY (чтобы избежать конфликта с REL)
+                    self.device.emit((uinput.EV_KEY, key), 1)
             print(f"[UINPUT] DOWN {keys}")
         except Exception as e:
             print("[UINPUT] ERROR key_down:", e)
@@ -309,33 +353,34 @@ class InputManager:
             return
         try:
             for key in keys:
-                if isinstance(key, int):
-                    try:
-                        self.device.emit((uinput.EV_KEY, key), 0)
-                    except Exception:
-                        self.device.emit(key, 0)
+                if isinstance(key, tuple):
+                    self.device.emit(key, 0)
+                elif isinstance(key, int):
+                    # Явно отправляем как EV_KEY
+                    self.device.emit((uinput.EV_KEY, key), 0)
             print(f"[UINPUT] UP {keys}")
         except Exception as e:
             print("[UINPUT] ERROR key_up:", e)
-
-    def send_keystroke(self, keys):
-        if not self.device:
-            return
-        real = [k for k in keys if isinstance(k, int)]
-        if not real:
-            return
-        self.key_down(real)
-        time.sleep(0.015)
-        self.key_up(real)
 
     def emit_rel(self, code, value):
         """Отправляет относительное событие (движение мыши, скролл)."""
         if not self.device: return
         try:
-            # ИСПРАВЛЕНИЕ: Используем простой формат (code, value).
-            # python-uinput сам понимает, что это REL событие, если устройство создано с поддержкой REL_*.
-            self.device.emit(code, int(value))
-            print(f"[UINPUT] REL code={code} val={value}")
+            # ЛОГИКА ИСПРАВЛЕНИЯ:
+            # Если code приходит как кортеж (EV_TYPE, CODE), например (2, 0),
+            # нам нужно извлечь только CODE (0), так как EV_REL (2) мы подставляем явно ниже.
+            final_code = code
+            if isinstance(code, tuple) and len(code) == 2:
+                final_code = code[1]
+
+            # Приводим к int уже очищенный код
+            axis_code = int(final_code)
+            val = int(value)
+
+            # Отправляем событие. Структура: ((EV_REL, axis_code), value)
+            self.device.emit((uinput.EV_REL, axis_code), val)
+
+            print(f"[UINPUT] REL axis={axis_code} val={val}")
         except Exception as e:
             print(f"[UINPUT] ERROR emit_rel: {e}")
 
@@ -343,14 +388,15 @@ class InputManager:
         if not self.device:
             return
 
-        # Разделяем обычные клавиши (int) и специальные команды (tuple)
         simple_keys = []
 
         for k in keys:
-            if isinstance(k, int):
+            # Это может быть int или кортеж (EV_TYPE, CODE)
+            if isinstance(k, int) or (isinstance(k, tuple) and len(k) == 2 and k[0] == uinput.EV_KEY):
                 simple_keys.append(k)
+            # Это событие REL: (code, value) -> сразу выполняем
             elif isinstance(k, tuple) and len(k) == 2:
-                # Это событие REL: (code, value)
+                # Если код оси мыши, отправляем его через emit_rel
                 self.emit_rel(k[0], k[1])
 
         if simple_keys:
@@ -580,6 +626,7 @@ class MacroExecutor:
                     self.im.send_keystroke(current_chord)
                     current_chord = []
                 # Отправляем движение немедленно
+                # Вызовет исправленный emit_rel, который добавит EV_REL
                 self.im.emit_rel(item[0], item[1])
 
             # Если пришёл int (uinput-код) — добавляем в текущий аккорд
