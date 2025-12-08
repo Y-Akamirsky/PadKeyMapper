@@ -1,7 +1,7 @@
 # Maintainer: Yaroslav Akamirsky <akamirsky.yaros@gmail.com>
 pkgname=pad-key-mapper
 pkgver=0.0.1.1
-pkgrel=1
+pkgrel=2
 pkgdesc="MIDI to Keystroke Mapper for Midi controllers (Python/CustomTkinter)"
 arch=('x86_64')
 url="https://github.com/Y-Akamirsky/PadKey-Mapper"

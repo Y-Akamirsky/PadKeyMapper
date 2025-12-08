@@ -51,7 +51,7 @@ except ImportError:
 # --- 2. СБОР ДАННЫХ (DATAS) ---
 datas = [
     ('layouts.json', '.'),
-    ('PKMICON2.png', '.'),
+    ('icons/PR-PKMICON.png', '.'),
     ('pad-key-mapper.desktop', '.'),
 
     # ПРИНУДИТЕЛЬНО КОПИРУЕМ CUSTOMTKINTER ЦЕЛИКОМ
