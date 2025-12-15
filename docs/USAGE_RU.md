@@ -3,7 +3,7 @@
 ## 1. Интерфейс программы
 Интерфейс PKM состоит из трех основных частей:
 
-* **Локализация и лейаут (вверху):** Выбор MIDI ID Лэйаута Launchpad и языка.
+* **Локализация, выбор/создание конфига и лейаут (вверху):** Выбор MIDI ID Лэйаута Launchpad и языка, а так-же выбор и создание кастомного конфига.
 * **Список маппингов (посередине):** Таблица назначенных сочетаний клавиш и кнопка добавления макроса.
 * **Кнопка START/STOP, Режим старых цветов, Тема (снизу):** Запуск и остановка программы, смена режима подсветки, смена темы (Светлая/Темная)
 * **Редактор:** Появляется при добавлении макроса и редактировании.
@@ -16,11 +16,12 @@
 4.  Для отключения PKM нажмите кнопку **"⏹️ STOP"**.
 
 ## 3. Добавление нового макроса / Удаление старого
-1.  Нажмите кнопку **"➕ Add Macro"**. (Для добавления)
-2.  Нажмите на иконку корзины справа от имеющегося макроса. (Для удаления)
+1.  Выберите/создайте конфиг. (Или используйте стандартный)
+2.  Нажмите кнопку **"➕ Add Macro"**. (Для добавления)
+3.  Нажмите на иконку корзины справа от имеющегося макроса. (Для удаления)
     * *Внимание: Удаление сотрет макрос из конфигурационного файла!*
-3.  После нажатия на **"➕ Add Macro"** появится окно редактора макросов.
-4.  Следуйте инструкции "4. Редактирование макроса"
+4.  После нажатия на **"➕ Add Macro"** появится окно редактора макросов.
+5.  Следуйте инструкции "4. Редактирование макроса"
 
 ## 4. Редактирование макроса
 Редактор позволяет настроить, какое MIDI-событие вызывает какое действие:
@@ -30,61 +31,96 @@
     * **ID:** Введите уникальный номер MIDI ID (Если не знаете номер MIDI ID вашего пэда - переключите "Показать ID" в положение ВКЛ).
     * **Или:** Кликните на нужный вам пэд на виртуальном Launchpad ниже. Это автоматически запишет его в нужное поле
         * *Внимание: Убедитесь что вы выбрали верную карту/лейаут для вашей модели Launchpad! Иначе назначенный макрос может не отображатся, или быть не там после запуска **[START]**
+* **Mode (Режим):**
+    * **Выберите режим для вашего назначения:**
+        - **CommonKB**  -   Режим обычной клавиатуры, позволяет работать с клавишами зажимая их вручную для более гибкого использования модификаторов по типу Ctrl, Alt и т.п.
+        - **One-Shot**  -   Режим для единоразового проигрывания макроса, нажатия на клавишу.
+        - **Loop**      -   Режим для зацикленного проигрывания макроса, частого нажатия на клавишу. Не будет отключен пока снова не нажмете на кнопку/пэд
+        - **Toggle**    -   Режим для удержания клавиш нажатыми, пока пэд не будет нажат снова.
 * **Keys (Клавиши):**
     * Кликните в поле ввода.
     * Введите нужное сочетание клавиш. (Формат записи будет примерно таким: Key.ctrl + Key.shift + S) (Полный список обозначения клавиш будет указан ниже)
     * **Или:** Выберите нужные клавиши из меню по кнопке справа от поля ввода. (При нажатии на кнопки в меню - они будут записываться в поле корректно, со знаками "+")
+* **Mouse Actions (Действия Мыши):**
+    * Выберите из списка ось движения мыши (MOUSE_RELX (Перемещение по горизонтали) и MOUSE_RELY (По вертикали)) и нажмите для добавления в поле редактора.
+    * В поле вы увидите Key.mouse_x для MOUSE_RELX и Key.mouse_y для MOUSE_RELY.
+    * После обозначения оси движения необходимо задать само передвижение {REL:number}. Приведу пример:
+        ```
+        Key.mouse_x{REL:100} + {WAIT:10.0} + Key.mouse_x{REL:-100}
+        ```
+        - Этот скрипт сначала передвигает мышь на 100 пикселей влево, ждет 10 секунд и затем двигает на 100 пикселей вправо.
+    * Такой-же синтаксис справедлив для любого REL события, например для колесика мыши.
 * **Description (Описание):** Краткое имя для отображения в списке.
 * **Color (Цвет):** Выберите номер цвета из палитры Launchpad.
 * **[Save/Сохранить]**: Сохраняет изменение в config.json по пути ~/.config/PadKeyMapper/config.json и мгновенно применяет изменения.
 * **[Cancel/Отменить]**: Отменяет изменения не внося их в config.json.
 
 ## 5. обозначения клавиш
-```markdown
-    Key.ctrl        -       CTRL
-    Key.alt         -       ALT
-    Key.shift       -       SHIFT
-    Key.cmd         -       META/CMD
-    Key.enter       -       ENTER
-    Key.space       -       SPACE
-    Key.tab         -       TAB
-    Key.esc         -       ESC
-    Key.backspace   -       BACKSPACE
-    Key.delete      -       DEL
-    Key.insert      -       INSERT
-    Key.home        -       HOME
-    Key.end         -       END
-    Key.page_up     -       PAGE UP
-    Key.page_down   -       PAGE DOWN
-    Key.up          -       ↑
-    Key.down        -       ↓
-    Key.left        -       ←
-    Key.right       -       →
-    Key.ctrl_l      -       LEFT CTRL
-    Key.ctrl_r      -       RIGHT CTRL
-    Key.alt_l       -       LEFT ALT
-    Key.alt_r       -       RIGHT ALT
-    Key.shift_l     -       LEFT SHIFT
-    Key.shift_r     -       RIGHT SHIFT
-    Key.cmd_l       -       LEFT META/CMD
-    Key.cmd_r       -       RIGHT META/CMD
-    Key.caps_lock   -       CAPS LOCK
-    Key.num_lock    -       NUM LOCK
-    Key.print_screen-       PRT SCR
-    Key.num0        -       NUM 0
-    Key.num1        -       NUM 1
-    Key.num2        -       NUM 2
-    Key.num3        -       NUM 3
-    Key.num4        -       NUM 4
-    Key.num5        -       NUM 5
-    Key.num6        -       NUM 6
-    Key.num7        -       NUM 7
-    Key.num8        -       NUM 8
-    Key.num9        -       NUM 9
-    Key.num_dot     -       NUM .
-    Key.num_plus    -       NUM +
-    Key.num_min     -       NUM -
-    Key.num_eq      -       NUM =
-    Key.num_comm    -       NUM ,
-    Key.num_ast     -       NUM *
-```
+    ```markdown
+
+    Keyboard
+
+        Key.ctrl        -       CTRL
+        Key.alt         -       ALT
+        Key.shift       -       SHIFT
+        Key.cmd         -       META/CMD
+        Key.enter       -       ENTER
+        Key.space       -       SPACE
+        Key.tab         -       TAB
+        Key.esc         -       ESC
+        Key.backspace   -       BACKSPACE
+        Key.delete      -       DEL
+        Key.insert      -       INSERT
+        Key.home        -       HOME
+        Key.end         -       END
+        Key.page_up     -       PAGE UP
+        Key.page_down   -       PAGE DOWN
+        Key.up          -       ↑
+        Key.down        -       ↓
+        Key.left        -       ←
+        Key.right       -       →
+        Key.ctrl_l      -       LEFT CTRL
+        Key.ctrl_r      -       RIGHT CTRL
+        Key.alt_l       -       LEFT ALT
+        Key.alt_r       -       RIGHT ALT
+        Key.shift_l     -       LEFT SHIFT
+        Key.shift_r     -       RIGHT SHIFT
+        Key.cmd_l       -       LEFT META/CMD
+        Key.cmd_r       -       RIGHT META/CMD
+        Key.caps_lock   -       CAPS LOCK
+        Key.print_screen-       PRT SCR
+        
+    Numpad
+        
+        Key.num_lock    -       NUM LOCK
+        Key.num0        -       NUM 0
+        Key.num1        -       NUM 1
+        Key.num2        -       NUM 2
+        Key.num3        -       NUM 3
+        Key.num4        -       NUM 4
+        Key.num5        -       NUM 5
+        Key.num6        -       NUM 6
+        Key.num7        -       NUM 7
+        Key.num8        -       NUM 8
+        Key.num9        -       NUM 9
+        Key.num_dot     -       NUM .
+        Key.num_plus    -       NUM +
+        Key.num_min     -       NUM -
+        Key.num_eq      -       NUM =
+        Key.num_comm    -       NUM ,
+        Key.num_ast     -       NUM *
+        
+    Mouse Buttons and Actions
+        
+        Buttons
+        
+        Key.mouse_l     -       MOUSE_L (LEFT MB)
+        Key.mouse_r     -       MOUSE_R (RIGHT MB)
+        Key.mouse_m     -       MOUSE_M (MIDDLE MB)
+        
+        Axises (RELATIVE INPUTS)
+        
+        Key.mouse_x     -       MOUSE_RELX (Horizontal axis)
+        Key.mouse_y     -       MOUSE_RELY (Vertical axis)
+        Key.mouse_wh    -       MOUSE_WHEEL
+    ```

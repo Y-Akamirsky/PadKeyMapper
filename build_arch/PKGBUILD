@@ -12,7 +12,7 @@ install=pad-key-mapper.install
 source=("pad-key-mapper.install" "PR-PKMICON.svg") # Остальные файлы берем локально или из src
 sha256sums=('SKIP' 'SKIP')
 
-PKMICON=("PR-PKMICON.svg")
+PKMICON=("PKMICON2.svg")
 
 prepare() {
     # Создаем .desktop файл на лету

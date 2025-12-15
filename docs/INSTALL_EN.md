@@ -1,5 +1,13 @@
 # 🛠 PadKey Mapper Installation (EN)
 
+## ⚠️ ATTENTION:
+    * The program requires the `uinput` kernel module to be loaded to work!
+        - To do this, you need to execute the following command in the terminal:
+            ```bash
+            sudo modprobe uinput
+            ```
+        - The program usually informs you if it cannot find the module. But if it doesn't, please try running this command first before submitting an Issue.
+
 ## Universal AppImage
 
 For the program to work, it requires access to the kernel subsystem `uinput` (for keyboard emulation) and access to USB MIDI devices.
