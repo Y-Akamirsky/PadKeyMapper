@@ -3,7 +3,7 @@
 # --- 0. ЛОКАЛИЗАЦИЯ И НАСТРОЙКИ ---
 # Дефолтный язык (RU или EN)
 CURRENT_LANG = 'EN'
-VERSION = 'Pre-Alpha 0.0.1.1'
+VERSION = 'Pre-Alpha 0.0.1.2'
 
 L10N = {
     'EN': {

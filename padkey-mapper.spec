@@ -6,7 +6,7 @@ from PyInstaller.utils.hooks import collect_all
 
 # --- 1. АВТОМАТИЧЕСКИЙ ПОИСК БИБЛИОТЕК ---
 
-# 1.1 Поиск uinput (Усиленный поиск .so файла)
+# 1.1 Поиск uinput (Логика сохранена полностью)
 try:
     import uinput
     # Путь к папке пакета 'uinput' (e.g., .../site-packages/uinput)
@@ -28,7 +28,6 @@ try:
         so_files = glob.glob(os.path.join(SITE_PACKAGES_DIR, '*.so'))
 
     if not so_files:
-         # <-- Здесь была ошибка. Теперь бросаем ее после всех попыток.
          raise FileNotFoundError("Не найден .so файл для uinput. Проверьте, что пакет python-uinput установлен корректно.")
 
     UINPUT_SO_PATH = so_files[0]
@@ -38,46 +37,21 @@ except ImportError:
     print("❌ Uinput not found! Please install it in this venv.")
     sys.exit(1)
 
-# 1.2 Поиск CustomTkinter
-try:
-    import customtkinter
-    ctk_path = os.path.dirname(customtkinter.__file__)
-    print(f"✅ Found CustomTkinter at: {ctk_path}")
-except ImportError:
-    print("❌ CustomTkinter not found! Run: pip install customtkinter")
-    sys.exit(1)
-
 
 # --- 2. СБОР ДАННЫХ (DATAS) ---
 datas = [
     ('layouts.json', '.'),
-    ('icons/PKMICON2.png', '.'),
+    ('icons/PKMICON2.png', '.'), # Убедись, что файл существует по этому пути
     ('pad-key-mapper.desktop', '.'),
-
-    # ПРИНУДИТЕЛЬНО КОПИРУЕМ CUSTOMTKINTER ЦЕЛИКОМ
-    (ctk_path, 'customtkinter'),
 
     # КОПИРУЕМ UINPUT PYTHON ФАЙЛЫ
     (os.path.join(UINPUT_DIR, '*.py'), 'uinput')
 ]
 
-
 # --- 3. СКРЫТЫЕ ИМПОРТЫ (HIDDENIMPORTS) ---
-hiddenimports = [
-    'sysconfig',
-    'distutils',
-    'tkinter',
-    'PIL._tkinter_finder',
-    # Важные зависимости CTk, которые иногда теряются
-    'customtkinter',
-    'darkdetect',
-    'packaging',
-    'packaging.version',
-    'packaging.specifiers',
-    'packaging.requirements'
-]
+hiddenimports = []
 
-# Собираем данные Mido
+# Собираем данные Mido (как и раньше)
 tmp_mido = collect_all('mido')
 hiddenimports += ['mido.backends.rtmidi']
 datas += tmp_mido[0]
@@ -87,8 +61,8 @@ hiddenimports += tmp_mido[2]
 # --- 4. БИНАРНИКИ ---
 # Uinput .so кладем в корень (для загрузчика) и в папку пакета (для питона)
 binaries = [
-    (UINPUT_SO_PATH, '.'),       # Кладем в корень сборки (dist/PadKeyMapper/)
-    (UINPUT_SO_PATH, 'uinput')   # Кладем в папку пакета (dist/PadKeyMapper/uinput)
+    (UINPUT_SO_PATH, '.'),       # Кладем в корень сборки
+    (UINPUT_SO_PATH, 'uinput')   # Кладем в папку пакета
 ]
 
 block_cipher = None
@@ -98,11 +72,12 @@ a = Analysis(
     pathex=[],
     binaries=binaries,
     datas=datas,
+    # Исключаем Tkinter, чтобы не тащить лишний вес
+    excludes=['tkinter', 'customtkinter', 'tcl', 'tk', '_tkinter', 'darkdetect'],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -121,7 +96,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True, # Оставь True для отладки
+    console=True, # Оставь True для отладки, в релизе можно поменять на False (но тогда stdout уйдет в /dev/null)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
