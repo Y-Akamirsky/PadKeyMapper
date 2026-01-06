@@ -4,9 +4,17 @@ import glob
 import time
 import json
 import threading
-import re  # Добавлено для парсинга пауз
-import tkinter as tk
-import customtkinter as ctk
+import re
+
+# --- QT IMPORTS ---
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QGridLayout, QLabel, QPushButton,
+                             QComboBox, QTableWidget, QTableWidgetItem,
+                             QHeaderView, QAbstractItemView, QDialog,
+                             QLineEdit, QCheckBox, QScrollArea, QFrame, QMessageBox,
+                             QSizePolicy, QInputDialog)
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QSize, QTimer
+from PyQt6.QtGui import QColor, QFont, QAction
 
 # --- 0. НАСТРОЙКА ОКРУЖЕНИЯ (DEPENDENCY BOOTLOADER) ---
 def setup_paths():
@@ -39,9 +47,8 @@ UINPUT_ERROR = None
 try:
     import uinput
     UINPUT_AVAILABLE = True
-    # PATCH: Убедимся, что константы типов событий существуют
     if not hasattr(uinput, "EV_KEY"): setattr(uinput, "EV_KEY", 1)
-    if not hasattr(uinput, "EV_REL"): setattr(uinput, "EV_REL", 2) # <--- ДОБАВЛЕНО
+    if not hasattr(uinput, "EV_REL"): setattr(uinput, "EV_REL", 2)
     if not hasattr(uinput, "EV_ABS"): setattr(uinput, "EV_ABS", 3)
 except ImportError as e:
     UINPUT_ERROR = f"ImportError: {e}"
@@ -52,7 +59,6 @@ except Exception as e:
 
 if UINPUT_AVAILABLE:
     if not hasattr(uinput, "EV_KEY"):
-        # 1 — значение EV_KEY в Linux input-event-codes.h
         setattr(uinput, "EV_KEY", 1)
 
 import localization
@@ -88,7 +94,6 @@ if not os.path.exists(CONFIG_DIR):
 class SettingsManager:
     DEFAULT_SETTINGS = {
         "language": "EN",
-        "theme": "Dark",
         "legacy_colors": False,
         "last_profile": "default.json",
         "last_layout": "Launchpad Mini/S/MK2/X"
@@ -121,7 +126,6 @@ COLOR_TRANSLATION_TABLE = {
 }
 
 def load_layouts(filename="layouts.json"):
-    # 1. Загрузка встроенных лейаутов
     path = os.path.join(BASE_DIR, filename)
     layouts = {}
     try:
@@ -131,19 +135,14 @@ def load_layouts(filename="layouts.json"):
     except Exception as e:
         print(f"⚠️ Error loading layouts.json: {e}")
 
-    # 2. Загрузка пользовательских лейаутов (layouts_user.json)
-    # Ищем в папке конфига (CONFIG_DIR определен в начале main.py)
     user_path = os.path.join(CONFIG_DIR, "layouts_user.json")
     if os.path.exists(user_path):
         try:
             with open(user_path, 'r', encoding='utf-8') as f:
                 user_layouts = json.load(f)
-                # Объединяем (пользовательские перезаписывают или дополняют встроенные)
                 layouts.update(user_layouts)
-                print(f"✅ Loaded user layouts from {user_path}")
         except Exception as e:
             print(f"⚠️ Error loading layouts_user.json: {e}")
-
     return layouts
 
 def get_available_profiles():
@@ -179,26 +178,16 @@ def load_profile_data(filename):
         m_id = mapping.get('id')
         m_keys_str = mapping.get('keys', [])
         m_color = mapping.get('color', 0)
-        m_mode = mapping.get('mode', 'Common-KB') # Default mode
+        m_mode = mapping.get('mode', 'Common-KB')
 
-        # Парсинг клавиш для исполнителя макросов
-        # Теперь мы сохраняем сырые строки для пауз ({WAIT:X}), а клавиши преобразуем
-        # [FIX] Парсинг клавиш для исполнителя макросов
         parsed_sequence = []
         for key_str in m_keys_str:
-            # 1. Проверка на паузу
             if key_str.startswith("{WAIT:") and key_str.endswith("}"):
                 parsed_sequence.append(key_str)
-
-            # 2. [FIX] Проверка на REL события (пропускаем строку дальше, парсинг будет в MacroExecutor)
             elif "{REL:" in key_str and "}" in key_str:
                 parsed_sequence.append(key_str)
-
-            # 3. Обычные клавиши из констант
             elif key_str in constants.KEY_MAPPINGS:
                 parsed_sequence.append(constants.KEY_MAPPINGS[key_str])
-
-            # 4. Буквы/цифры
             elif len(key_str) == 1 and (key_str.isalpha() or key_str.isdigit()):
                 try:
                     attr_name = f'KEY_{key_str.upper()}'
@@ -215,7 +204,6 @@ def load_profile_data(filename):
         }
         all_mappings_data.append(entry)
 
-        # Словарь для быстрого поиска в потоке
         mapping_dict = {'keys': parsed_sequence, 'color': m_color, 'mode': m_mode}
         try:
             clean_id = int(m_id)
@@ -257,59 +245,38 @@ class InputManager:
         if not UINPUT_AVAILABLE or self.init_error: return
 
         all_keys = set()
-
-        # Список имен ключей, которые относятся к осям мыши (Relative events)
         rel_names = ['Key.mouse_x', 'Key.mouse_y', 'Key.mouse_wh']
 
-        # 1. Обработка KEY_MAPPINGS
         for name, key_val in constants.KEY_MAPPINGS.items():
             try:
-                # СЦЕНАРИЙ 1: Значение уже кортеж (например, (EV_REL, code))
                 if isinstance(key_val, tuple):
                     all_keys.add((int(key_val[0]), int(key_val[1])))
                     continue
-
-                # СЦЕНАРИЙ 2: Значение - число (стандартный uinput)
                 code = int(key_val)
-
-                # Если это ось мыши — регистрируем как EV_REL (кортеж)
                 if name in rel_names:
                     all_keys.add((uinput.EV_REL, code))
                 else:
-                    # Иначе — как клавишу (EV_KEY) (число)
                     all_keys.add(code)
-
             except Exception as e:
-                # Это предупреждение, а не критическая ошибка, можно пропустить проблемные ключи
-                print(f"[INIT WARN] Skipped key {name}: {e}")
                 continue
 
-        # 2. Добавляем буквы/цифры (защищенный код)
         for char in 'abcdefghijklmnopqrstuvwxyz0123456789':
             attr_name = f'KEY_{char.upper()}'
             if hasattr(uinput, attr_name):
                 key_code = getattr(uinput, attr_name)
-
                 if isinstance(key_code, tuple):
-                    # Если это кортеж (EV_TYPE, CODE) - добавляем
                     all_keys.add((int(key_code[0]), int(key_code[1])))
                 else:
-                    # Если это число - добавляем
                     all_keys.add(int(key_code))
 
-        # 3. Добавляем кнопки мыши явно (защищенный код)
         try:
             mouse_btns = [uinput.BTN_LEFT, uinput.BTN_RIGHT, uinput.BTN_MIDDLE]
             for btn in mouse_btns:
-                # ИСПРАВЛЕНИЕ ДЛЯ КНОПОК МЫШИ: Проверяем, является ли код кортежем
                 if isinstance(btn, tuple):
-                    # Если это кортеж (EV_TYPE, CODE) - добавляем
                     all_keys.add((int(btn[0]), int(btn[1])))
                 else:
-                    # Если это число - добавляем
                     all_keys.add(int(btn))
         except AttributeError:
-            # Возможно, нет поддержки кнопок мыши
             pass
 
         final_key_list = list(all_keys)
@@ -318,7 +285,6 @@ class InputManager:
             return
 
         try:
-            # Создание устройства
             self.device = uinput.Device(final_key_list)
             print(f"✅ uinput device created. Capabilities: {len(final_key_list)}")
         except OSError as e:
@@ -333,72 +299,39 @@ class InputManager:
             self.init_error = str(e)
 
     def key_down(self, keys):
-        if not self.device or not keys:
-            return
+        if not self.device or not keys: return
         try:
             for key in keys:
-                # Если приходит кортеж (тип, код) — используем его
-                if isinstance(key, tuple):
-                    self.device.emit(key, 1)
-                # Если int — это клавиша
-                elif isinstance(key, int):
-                    # Явно отправляем как EV_KEY (чтобы избежать конфликта с REL)
-                    self.device.emit((uinput.EV_KEY, key), 1)
-            print(f"[UINPUT] DOWN {keys}")
-        except Exception as e:
-            print("[UINPUT] ERROR key_down:", e)
+                if isinstance(key, tuple): self.device.emit(key, 1)
+                elif isinstance(key, int): self.device.emit((uinput.EV_KEY, key), 1)
+        except Exception as e: print("[UINPUT] ERROR key_down:", e)
 
     def key_up(self, keys):
-        if not self.device or not keys:
-            return
+        if not self.device or not keys: return
         try:
             for key in keys:
-                if isinstance(key, tuple):
-                    self.device.emit(key, 0)
-                elif isinstance(key, int):
-                    # Явно отправляем как EV_KEY
-                    self.device.emit((uinput.EV_KEY, key), 0)
-            print(f"[UINPUT] UP {keys}")
-        except Exception as e:
-            print("[UINPUT] ERROR key_up:", e)
+                if isinstance(key, tuple): self.device.emit(key, 0)
+                elif isinstance(key, int): self.device.emit((uinput.EV_KEY, key), 0)
+        except Exception as e: print("[UINPUT] ERROR key_up:", e)
 
     def emit_rel(self, code, value):
-        """Отправляет относительное событие (движение мыши, скролл)."""
         if not self.device: return
         try:
-            # ЛОГИКА ИСПРАВЛЕНИЯ:
-            # Если code приходит как кортеж (EV_TYPE, CODE), например (2, 0),
-            # нам нужно извлечь только CODE (0), так как EV_REL (2) мы подставляем явно ниже.
             final_code = code
-            if isinstance(code, tuple) and len(code) == 2:
-                final_code = code[1]
-
-            # Приводим к int уже очищенный код
+            if isinstance(code, tuple) and len(code) == 2: final_code = code[1]
             axis_code = int(final_code)
             val = int(value)
-
-            # Отправляем событие. Структура: ((EV_REL, axis_code), value)
             self.device.emit((uinput.EV_REL, axis_code), val)
-
-            print(f"[UINPUT] REL axis={axis_code} val={val}")
-        except Exception as e:
-            print(f"[UINPUT] ERROR emit_rel: {e}")
+        except Exception as e: print(f"[UINPUT] ERROR emit_rel: {e}")
 
     def send_keystroke(self, keys):
-        if not self.device:
-            return
-
+        if not self.device: return
         simple_keys = []
-
         for k in keys:
-            # Это может быть int или кортеж (EV_TYPE, CODE)
             if isinstance(k, int) or (isinstance(k, tuple) and len(k) == 2 and k[0] == uinput.EV_KEY):
                 simple_keys.append(k)
-            # Это событие REL: (code, value) -> сразу выполняем
             elif isinstance(k, tuple) and len(k) == 2:
-                # Если код оси мыши, отправляем его через emit_rel
                 self.emit_rel(k[0], k[1])
-
         if simple_keys:
             self.key_down(simple_keys)
             time.sleep(0.015)
@@ -407,123 +340,65 @@ class InputManager:
 INPUT_MANAGER = InputManager()
 
 class MacroExecutor:
-    """
-    Класс для обработки сложной логики макросов: задержки, циклы, удержания.
-    """
     def __init__(self, input_manager):
         self.im = input_manager
-        self.active_loops = {}   # {id: stop_event}
-        self.active_toggles = {} # {id: bool_state} (True = Held down)
-        self.threads = {}        # {id: thread}
+        self.active_loops = {}
+        self.active_toggles = {}
+        self.app = None
 
     def execute(self, mapping_id, mapping_data, is_note_on):
         mode = mapping_data.get('mode', 'One-Shot')
         keys = mapping_data.get('keys', [])
+        if not keys: return
 
-        if not keys:
-            return
-
-        # --- Helper: convert items to uinput codes ---
         def _resolve_key_list(raw_keys):
             resolved = []
             for item in raw_keys:
-
-                # 1. WAIT
                 if isinstance(item, str) and item.startswith("{WAIT:"):
                     resolved.append(item)
                     continue
-
-                # 2. RELATIVE MOUSE: Key.mouse_x{REL:5}
-                # Ищем подстроку {REL:число}. Regex более мягкий.
                 if "{REL:" in item:
-                    # Ищем группу {REL:(-число)}
                     rel_match = re.search(r"\{REL:(-?\d+)\}", item)
                     if rel_match:
                         try:
                             val = int(rel_match.group(1))
-                            # Имя клавиши — это всё, что до {REL:
                             key_part = item.split("{REL:")[0].strip()
-
                             if key_part in constants.KEY_MAPPINGS:
                                 code = constants.KEY_MAPPINGS[key_part]
                                 resolved.append((code, val))
-                                print(f"   -> [PARSER] REL OK: {key_part} -> code {code}, val {val}")
                                 continue
-                            else:
-                                print(f"   -> [PARSER] WARN: Key '{key_part}' not found for REL")
-                        except ValueError:
-                            pass
-
+                        except ValueError: pass
                 if item in constants.KEY_MAPPINGS:
-                    # Если это ось мыши, но БЕЗ тега REL — пропускаем, чтобы не нажать её как кнопку
-                    if item in ['Key.mouse_x', 'Key.mouse_y', 'Key.mouse_wh']:
-                        continue
+                    if item in ['Key.mouse_x', 'Key.mouse_y', 'Key.mouse_wh']: continue
                     resolved.append(constants.KEY_MAPPINGS[item])
                     continue
-
-                # 3. New format — Key.xxx
                 if isinstance(item, str) and item in constants.KEY_MAPPINGS:
                     resolved.append(constants.KEY_MAPPINGS[item])
                     continue
-
-                # 4. Old tuple format (1, 108)
                 if isinstance(item, tuple) and len(item) == 2:
                     code = item[1]
-                    if isinstance(code, int):
-                        resolved.append(code)
-                        continue
-
-                # 5. Already integer
-                if isinstance(item, int):
-                    resolved.append(item)
-                    continue
-
-                # 6. Numeric string
-                if isinstance(item, str) and item.isdigit():
-                    resolved.append(int(item))
-                    continue
-
-                # 7. KEY_SOMETHING
+                    if isinstance(code, int): resolved.append(code); continue
+                if isinstance(item, int): resolved.append(item); continue
+                if isinstance(item, str) and item.isdigit(): resolved.append(int(item)); continue
                 if isinstance(item, str) and item.startswith("KEY_"):
-                    if hasattr(uinput, item):
-                        resolved.append(getattr(uinput, item))
-                        continue
-
-                # 8. 'a' / 'b' / '1'
+                    if hasattr(uinput, item): resolved.append(getattr(uinput, item)); continue
                 if isinstance(item, str) and len(item) == 1:
                     keyname = f"KEY_{item.upper()}"
-                    if hasattr(uinput, keyname):
-                        resolved.append(getattr(uinput, keyname))
-                        continue
-
-                # 9. ENTER / TAB etc
+                    if hasattr(uinput, keyname): resolved.append(getattr(uinput, keyname)); continue
                 if isinstance(item, str):
                     keyname = f"KEY_{item.upper()}"
-                    if hasattr(uinput, keyname):
-                        resolved.append(getattr(uinput, keyname))
-                        continue
+                    if hasattr(uinput, keyname): resolved.append(getattr(uinput, keyname)); continue
+            return resolved
 
-                print(f"[WARN] Unrecognized key '{item}'")
-
-            return resolved     # ← ВОТ ТЕПЕРЬ НА СВОЁМ МЕСТЕ!
-
-        # --- Now convert ---
         resolved_keys = _resolve_key_list(keys)
-        print(f"[EXECUTE] id={mapping_id}, mode={mode}, is_on={is_note_on}, resolved={resolved_keys}")
+        if not resolved_keys: return
 
-        if not resolved_keys:
-            return
-
-        # --- MODES ---
         if mode == "Common-KB":
-            # Фильтруем: Common-KB не может "удерживать" REL события, только клавиши
             real_keys = [k for k in resolved_keys if isinstance(k, int)]
             if is_note_on:
                 self.im.key_down(real_keys)
-                # REL события срабатывают один раз при нажатии
                 for k in resolved_keys:
                     if isinstance(k, tuple): self.im.emit_rel(k[0], k[1])
-
                 color = mapping_data.get("color", 15)
                 if self.app:
                     self.app.start_feedback(mapping_id, color_on="#009900")
@@ -538,42 +413,30 @@ class MacroExecutor:
         if mode == 'One-Shot':
             if is_note_on:
                 threading.Thread(target=self._run_sequence, args=(resolved_keys,)).start()
-                self.app.start_feedback(mapping_id, color_on="#FF0000", color_off="#303030")
-                # HW flash
-                color = mapping_data.get("color", 15)
-                self.app.start_hw_feedback(mapping_id, color)
-
+                if self.app:
+                    self.app.start_feedback(mapping_id, color_on="#FF0000", color_off="#303030")
+                    self.app.start_hw_feedback(mapping_id, mapping_data.get("color", 15))
             else:
-                self.app.stop_feedback(mapping_id)
-                self.app.stop_hw_feedback(mapping_id)
-
-        elif mode == 'Loop':
-            # В режиме Loop мы игнорируем is_note_on=False (velocity=0)
-            if is_note_on:
-
-                # Если уже есть запущенная петля — останавливаем (toggle)
-                if mapping_id in self.active_loops:
-                    print(f"[LOOP] Stop loop {mapping_id}")
-                    self.active_loops[mapping_id].set()
-                    del self.active_loops[mapping_id]
+                if self.app:
                     self.app.stop_feedback(mapping_id)
                     self.app.stop_hw_feedback(mapping_id)
-                    return
 
-                # Иначе — запускаем новую
-                print(f"[LOOP] Start loop {mapping_id}")
+        elif mode == 'Loop':
+            if is_note_on:
+                if mapping_id in self.active_loops:
+                    self.active_loops[mapping_id].set()
+                    del self.active_loops[mapping_id]
+                    if self.app:
+                        self.app.stop_feedback(mapping_id)
+                        self.app.stop_hw_feedback(mapping_id)
+                    return
                 stop_event = threading.Event()
                 self.active_loops[mapping_id] = stop_event
                 t = threading.Thread(target=self._run_loop, args=(resolved_keys, stop_event))
                 t.start()
-
-                # 🔥 запускаем мигающий фидбек
-                self.app.start_feedback(mapping_id)
-
-                # --- HW ---
-                color = mapping_data.get("color", 15)
-                self.app.start_hw_feedback(mapping_id, color)
-
+                if self.app:
+                    self.app.start_feedback(mapping_id)
+                    self.app.start_hw_feedback(mapping_id, mapping_data.get("color", 15))
 
         elif mode == 'Toggle (Hold)':
             if is_note_on:
@@ -581,10 +444,8 @@ class MacroExecutor:
                 real_keys = [k for k in resolved_keys if isinstance(k, int)]
                 if not held:
                     self.im.key_down(real_keys)
-                    # REL события для тоггла срабатывают при включении
                     for item in resolved_keys:
                         if isinstance(item, tuple): self.im.emit_rel(item[0], item[1])
-
                     self.active_toggles[mapping_id] = True
                     if self.app:
                         self.app.start_feedback(mapping_id)
@@ -596,61 +457,33 @@ class MacroExecutor:
                         self.app.stop_feedback(mapping_id)
                         self.app.stop_hw_feedback(mapping_id)
 
-
     def _run_sequence(self, keys):
-        """Выполняет последовательность один раз с учётом пауз.
-        Ожидается, что `keys` уже содержит int (uinput-коды) и/или строковые команды {WAIT:X}.
-        """
         current_chord = []
-
         for item in keys:
-            # Команда паузы: перед паузой отправляем накопленный аккорд (если есть)
             if isinstance(item, str) and item.startswith("{WAIT:"):
                 if current_chord:
-                    # Отправляем текущий аккорд (список int)
                     self.im.send_keystroke(current_chord)
                     current_chord = []
-
-                # Парсим число и ждём нужное время
                 try:
                     val = float(re.search(r"[\d\.]+", item).group())
                     time.sleep(val)
-                except Exception:
-                    # если парсинг упал — просто пропускаем
-                    pass
-
-            # REL EVENT (tuple: code, val)
+                except Exception: pass
             elif isinstance(item, tuple) and len(item) == 2:
-                # Если у нас накоплен аккорд клавиш, сбрасываем его перед движением мыши
                 if current_chord:
                     self.im.send_keystroke(current_chord)
                     current_chord = []
-                # Отправляем движение немедленно
-                # Вызовет исправленный emit_rel, который добавит EV_REL
                 self.im.emit_rel(item[0], item[1])
-
-            # Если пришёл int (uinput-код) — добавляем в текущий аккорд
             elif isinstance(item, int):
                 current_chord.append(item)
-
-            # Защитная ветка: иногда ключи могут быть строками-числами
             elif isinstance(item, str) and item.isdigit():
-                try:
-                    current_chord.append(int(item))
-                except:
-                    pass
-
-            # Игнорируем остальные неподдерживаемые типы/строки
-
-        # После цикла — отсылаем остаток (если есть)
+                try: current_chord.append(int(item))
+                except: pass
         if current_chord:
             self.im.send_keystroke(current_chord)
 
     def _run_loop(self, keys, stop_event):
-        """Выполняет цикл пока не установлен stop_event"""
         while not stop_event.is_set():
             self._run_sequence(keys)
-            # Небольшая пауза между итерациями, если в макросе нет своих пауз, чтобы не спамить CPU
             if not any(isinstance(k, str) and "WAIT" in k for k in keys):
                 time.sleep(0.05)
 
@@ -681,39 +514,26 @@ class MidiListenerThread(threading.Thread):
                 self.app.update_status_label(localization.get_string('STATUS_LISTENING', port_name=self.port_name))
 
                 while not self._stop_event.is_set():
-                    # Обрабатываем все ожидающие сообщения (более надёжно, чем receive(block=False))
                     processed_any = False
                     for msg in port.iter_pending():
                         processed_any = True
-                        # NOTE EVENTS
                         if msg.type == 'note_on' or msg.type == 'note_off':
                             raw_id = msg.note
-                            # сначала ищем строковый ключ (как в config.json), затем — целочисленный запасной вариант
                             id_str = str(raw_id)
                             keys_data = self.app.key_map.get(id_str)
-                            if keys_data is None:
-                                keys_data = self.app.key_map.get(raw_id)
-
+                            if keys_data is None: keys_data = self.app.key_map.get(raw_id)
                             if keys_data:
                                 is_on = (msg.type == 'note_on' and getattr(msg, 'velocity', 0) > 0)
-                                # краткий debug в консоль — можно убрать после отладки
-                                print(f"[MIDI] note {raw_id} -> mapping found, is_on={is_on}")
                                 MACRO_EXECUTOR.execute(id_str if id_str in self.app.key_map else raw_id, keys_data, is_on)
-
-                        # CC EVENTS
                         elif msg.type == 'control_change':
                             raw_id = msg.control
                             id_str = str(raw_id)
                             keys_data = self.app.cc_map.get(id_str)
-                            if keys_data is None:
-                                keys_data = self.app.cc_map.get(raw_id)
-
+                            if keys_data is None: keys_data = self.app.cc_map.get(raw_id)
                             if keys_data:
                                 is_on = (getattr(msg, 'value', 0) > 0)
-                                print(f"[MIDI] cc {raw_id} -> mapping found, is_on={is_on}")
                                 MACRO_EXECUTOR.execute(id_str if id_str in self.app.cc_map else raw_id, keys_data, is_on)
 
-                    # Если ничего не было, даём небольшой отдых
                     if not processed_any:
                         time.sleep(0.005)
 
@@ -732,121 +552,50 @@ class MidiListenerThread(threading.Thread):
             try: self.app.midi_output.send(Message('control_change', control=int(cc_id), value=safe_color))
             except: pass
 
-# --- 5. GUI COMPONENTS ---
 
-def bind_linux_scroll(widget):
-    """
-    Рекурсивно биндит скролл для Linux на виджет и всех его детей.
-    """
-    if not sys.platform.startswith('linux'):
-        return
+# --- 5. GUI COMPONENTS (PyQt6) ---
 
-    # Целевая функция скролла (замыкание на widget)
-    # Находим ближайший scrollable контейнер
-    scroll_target = None
-
-    # Пытаемся найти родительский canvas или scrollframe, к которому относится этот виджет
-    parent = widget
-    while parent:
-        if isinstance(parent, ctk.CTkScrollableFrame):
-            # У CTkScrollableFrame канвас лежит глубже
-            try: scroll_target = parent._parent_canvas
-            except: pass
-            break
-        if isinstance(parent, (tk.Canvas, ctk.CTkCanvas)):
-            scroll_target = parent
-            break
-        parent = parent.master
-
-    if not scroll_target:
-        return
-
-    def _on_scroll_up(event):
-        scroll_target.yview_scroll(-1, "units")
-        return "break" # Предотвращаем стандартную обработку
-
-    def _on_scroll_down(event):
-        scroll_target.yview_scroll(1, "units")
-        return "break"
-
-    # Рекурсивная функция назначения
-    def _recursive_bind(w):
-        # Биндим только если виджет сам не скроллится (например, текстовое поле)
-        if not isinstance(w, (tk.Text, ctk.CTkTextbox, tk.Listbox)):
-            w.bind("<Button-4>", _on_scroll_up, add="+")
-            w.bind("<Button-5>", _on_scroll_down, add="+")
-
-        for child in w.winfo_children():
-            _recursive_bind(child)
-
-    # Запускаем биндинг (можно с небольшой задержкой, чтобы отрисовались дети)
-    widget.after(100, lambda: _recursive_bind(widget))
-
-class VirtualPadVisualizer(ctk.CTkFrame):
-    """
-    Универсальный виджет для отображения Launchpad.
-    ИСПРАВЛЕНИЯ: Квадратные кнопки, отсутствие растягивания текста.
-    """
-    def __init__(self, master, layout_config, button_callback=None, btn_size=40, **kwargs):
-        super().__init__(master, **kwargs)
+class VirtualPadVisualizer(QWidget):
+    def __init__(self, parent=None, layout_config={}, button_callback=None, btn_size=40):
+        super().__init__(parent)
         self.layout_config = layout_config
         self.button_callback = button_callback
         self.btn_size = btn_size
         self.buttons = {}
 
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.grid_frame = QFrame()
+        self.grid = QGridLayout(self.grid_frame)
+        self.grid.setSpacing(2)
+        self.main_layout.addWidget(self.grid_frame)
+
         self.render()
 
     def render(self):
-        for widget in self.winfo_children(): widget.destroy()
+        # Clear existing
+        for i in reversed(range(self.grid.count())):
+            self.grid.itemAt(i).widget().setParent(None)
         self.buttons = {}
 
         layout_type = self.layout_config.get("type", "Mini")
 
-        # Настройка сетки: не используем uniform, чтобы контролировать размер вручную
-        # или используем frame-контейнер для центрирования
+        def add_btn(row, col, label, m_type, m_id, is_side=False):
+            btn = QPushButton(label)
+            btn.setFixedSize(self.btn_size, self.btn_size)
+            btn.setProperty("is_side", is_side)
 
-        # Основной контейнер сетки (центрируем его внутри self)
-        grid_frame = ctk.CTkFrame(self, fg_color="transparent")
-        grid_frame.pack(anchor="center")
-
-        def add_btn(row, col, label, m_type, m_id, radius, is_side=False):
-            default_color = MAIN_GRID_COLOR
-            if is_side:
-                default_color = SIDE_GRID_COLOR
-
-            # Создаем фрейм-обертку, чтобы задать жесткий размер
-            # CTkButton имеет баг/особенность, где текст может расширять кнопку.
-            container = ctk.CTkFrame(grid_frame, width=self.btn_size, height=self.btn_size, fg_color="transparent")
-            container.grid_propagate(False) # Запрещаем менять размер от содержимого
-            container.grid(row=row, column=col, padx=1, pady=1)
-
-            btn = ctk.CTkButton(
-                container,
-                text=label,
-                width=self.btn_size,
-                height=self.btn_size,
-                corner_radius=radius,
-                fg_color=default_color,
-                font=("Arial", 9),
-                hover_color="gray50"
-            )
+            # Default style
+            bg_color = "#393939" if not is_side else "#1e1e1e"
+            btn.setStyleSheet(f"background-color: {bg_color}; border-radius: 4px; color: white;")
 
             if self.button_callback:
-                btn.configure(command=lambda t=m_type, i=m_id: self.button_callback(i, t))
+                btn.clicked.connect(lambda _, t=m_type, i=m_id: self.button_callback(i, t))
             else:
-                btn.configure(state="disabled", text_color_disabled="white")
+                btn.setEnabled(False)
 
-            # Размещаем кнопку внутри жесткого контейнера.
-            # sticky="" (по умолчанию) центрирует её.
-            btn.place(relx=0.5, rely=0.5, anchor="center", relwidth=1, relheight=1)
-
+            self.grid.addWidget(btn, row, col)
             self.buttons[(m_type, m_id)] = btn
-
-        SQUARE_RADIUS = 4
-        ROUND_RADIUS = SQUARE_RADIUS
-
-        MAIN_GRID_COLOR = "gray30"
-        SIDE_GRID_COLOR = "gray28"
 
         if layout_type == "Mini":
             cc_start = self.layout_config.get("cc_row_start", 104)
@@ -854,15 +603,15 @@ class VirtualPadVisualizer(ctk.CTkFrame):
             side_notes = self.layout_config.get("side_notes", [])
 
             for idx, cc_id in enumerate(range(cc_start, cc_end + 1)):
-                add_btn(0, idx, f"{cc_id}", 'cc', cc_id, ROUND_RADIUS)
+                add_btn(0, idx, f"{cc_id}", 'cc', cc_id)
 
             for r in range(8):
                 for c in range(8):
                     note_id = r * 16 + c
-                    add_btn(r+1, c, "", 'note', note_id, SQUARE_RADIUS)
+                    add_btn(r+1, c, "", 'note', note_id)
                 if r < len(side_notes):
                     s_id = side_notes[r]
-                    add_btn(r+1, 8, f"{s_id}", 'note', s_id, ROUND_RADIUS, is_side=True)
+                    add_btn(r+1, 8, f"{s_id}", 'note', s_id, is_side=True)
 
         elif layout_type == "Pro":
              top = self.layout_config.get("top_notes", [])
@@ -872,48 +621,51 @@ class VirtualPadVisualizer(ctk.CTkFrame):
              grid_start = self.layout_config.get("grid_start_note", 11)
 
              for c, n_id in enumerate(top):
-                 add_btn(0, c+1, f"{n_id}", 'note', n_id, ROUND_RADIUS)
+                 add_btn(0, c+1, f"{n_id}", 'note', n_id)
 
              for r in range(8):
                  if r < len(left):
-                     add_btn(r+1, 0, f"{left[r]}", 'note', left[r], ROUND_RADIUS, is_side=True)
+                     add_btn(r+1, 0, f"{left[r]}", 'note', left[r], is_side=True)
                  for c in range(8):
                      note_id = grid_start + (7-r) * 10 + c
-                     add_btn(r+1, c+1, "", 'note', note_id, SQUARE_RADIUS)
+                     add_btn(r+1, c+1, "", 'note', note_id)
                  if r < len(right):
-                     add_btn(r+1, 9, f"{right[r]}", 'note', right[r], ROUND_RADIUS, is_side=True)
+                     add_btn(r+1, 9, f"{right[r]}", 'note', right[r], is_side=True)
 
              for c, n_id in enumerate(bottom):
-                 add_btn(9, c+1, f"{n_id}", 'note', n_id, ROUND_RADIUS)
+                 add_btn(9, c+1, f"{n_id}", 'note', n_id)
 
         elif layout_type == "Universal":
             notes = self.layout_config.get("notes", [])
             ccs = self.layout_config.get("cc", [])
             row, col = 0, 0
             for i in ccs:
-                add_btn(row, col, str(i), 'cc', i, ROUND_RADIUS, is_side=True)
+                add_btn(row, col, str(i), 'cc', i, is_side=True)
                 col += 1
                 if col > 15: col = 0; row += 1
             row += 1
             col = 0
             for i in notes:
-                add_btn(row, col, str(i), 'note', i, SQUARE_RADIUS)
+                add_btn(row, col, str(i), 'note', i)
                 col += 1
                 if col > 15: col = 0; row += 1
 
     def update_states(self, mappings_data, current_selection=None):
         layout_type = self.layout_config.get("type", "Mini")
-        for (m_type, m_id), btn in self.buttons.items():
-            base_color = "gray30"
-            if m_type == 'cc' or (layout_type == "Mini" and m_id % 16 == 8): base_color = "gray20"
 
-            # Проверяем, есть ли текст ID, который нужно показать
+        # Reset colors
+        for (m_type, m_id), btn in self.buttons.items():
+            base_color = "#393939"
+            if m_type == 'cc' or (layout_type == "Mini" and m_id % 16 == 8): base_color = "#1e1e1e"
+
             show_text = ""
             if layout_type != "Mini" or m_type == 'cc' or m_id % 16 == 8:
                 show_text = str(m_id)
 
-            btn.configure(fg_color=base_color, text=show_text)
+            btn.setText(show_text)
+            btn.setStyleSheet(f"background-color: {base_color}; border-radius: 4px; color: white;")
 
+        # Active mappings
         for idx, m in enumerate(mappings_data):
             if m['id'] == 'NEW': continue
             try:
@@ -921,7 +673,9 @@ class VirtualPadVisualizer(ctk.CTkFrame):
                 mtype = m['type']
                 if (mtype, mid) in self.buttons:
                     btn = self.buttons[(mtype, mid)]
-                    btn.configure(text=str(idx + 1), fg_color="teal" if mtype=='note' else "darkorange")
+                    btn.setText(str(idx + 1))
+                    color = "#0a78d1" if mtype=='note' else "#c28e0a" # Teal / DarkOrange
+                    btn.setStyleSheet(f"background-color: {color}; border-radius: 4px; color: white;")
             except: pass
 
         if current_selection:
@@ -930,209 +684,226 @@ class VirtualPadVisualizer(ctk.CTkFrame):
             try: cs_id = int(cs_id)
             except: pass
             if (cs_type, cs_id) in self.buttons:
-                self.buttons[(cs_type, cs_id)].configure(fg_color="red")
+                self.buttons[(cs_type, cs_id)].setStyleSheet("background-color: #f25a0f; border-radius: 4px; color: white;")
 
     def get_button_by_id(self, mapping_id):
+        # Only checks NOTE ID for simplicity in feedback loop for now, similar to original
+        # This is a limitation of the feedback loop structure in original code
         for (tp, mid), btn in self.buttons.items():
             if str(mid) == str(mapping_id):
                 return btn
         return None
 
-class KeySelectionWindow(ctk.CTkToplevel):
-    def __init__(self, master, target_entry):
-        super().__init__(master)
-        self.title(localization.get_string('KEY_SELECT_TITLE'))
-        self.geometry("300x500")
-        self.target_entry = target_entry
-        self.attributes("-topmost", True)
-        self.transient(master)
+    def set_btn_color(self, btn, color_hex):
+        btn.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px; color: white;")
 
-        self.scroll_frame = ctk.CTkScrollableFrame(self, label_text=localization.get_string('KEY_SELECT_LABEL'))
-        self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        bind_linux_scroll(self.scroll_frame)
+class KeySelectionDialog(QDialog):
+    def __init__(self, parent, target_entry):
+        super().__init__(parent)
+        self.target_entry = target_entry
+        self.setWindowTitle(localization.get_string('KEY_SELECT_TITLE'))
+        self.resize(350, 600)
+
+        layout = QVBoxLayout(self)
+
+        lbl = QLabel(localization.get_string('KEY_SELECT_LABEL'))
+        layout.addWidget(lbl)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content_widget = QWidget()
+        scroll_layout = QVBoxLayout(content_widget)
 
         sorted_keys = sorted(constants.KEY_MAPPINGS.keys())
         for key_name in sorted_keys:
             display_name = constants.KEY_DISPLAY_MAPPINGS.get(key_name, key_name)
-            btn = ctk.CTkButton(self.scroll_frame, text=display_name,
-                                command=lambda k=key_name: self.insert_key(k),
-                                height=25, anchor="w")
-            btn.pack(fill="x", pady=2)
+            btn = QPushButton(display_name)
+            btn.clicked.connect(lambda _, k=key_name: self.insert_key(k))
+            scroll_layout.addWidget(btn)
 
-        ctk.CTkLabel(self.scroll_frame, text=localization.get_string('KEY_SELECT_SYMBOLS')).pack(pady=5)
-        for char in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
-            btn = ctk.CTkButton(self.scroll_frame, text=char,
-                                command=lambda k=char: self.insert_key(k),
-                                height=25, anchor="w", fg_color="transparent", border_width=1)
-            btn.pack(fill="x", pady=2)
+        scroll_layout.addWidget(QLabel(localization.get_string('KEY_SELECT_SYMBOLS')))
+
+        grid_chars = QGridLayout()
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        r, c = 0, 0
+        for char in chars:
+            btn = QPushButton(char)
+            btn.setFixedSize(30, 30)
+            btn.clicked.connect(lambda _, k=char: self.insert_key(k))
+            grid_chars.addWidget(btn, r, c)
+            c += 1
+            if c > 5: c = 0; r += 1
+
+        scroll_layout.addLayout(grid_chars)
+        scroll.setWidget(content_widget)
+        layout.addWidget(scroll)
 
     def insert_key(self, key_value):
-        current_text = self.target_entry.get().strip()
+        current_text = self.target_entry.text().strip()
         key_to_insert = key_value
         if current_text and not current_text.endswith("+") and not current_text.endswith(" "):
             new_text = f"{current_text} + {key_to_insert}"
         else:
             new_text = f"{current_text}{key_to_insert}"
-        self.target_entry.delete(0, 'end')
-        self.target_entry.insert(0, new_text)
-        self.destroy()
+        self.target_entry.setText(new_text)
+        self.accept()
 
-class EditMappingWindow(ctk.CTkToplevel):
-    def __init__(self, master, mapping_data, index, layout_config):
-        super().__init__(master)
-        title_id = mapping_data['id'] if mapping_data['id'] != 'NEW' else localization.get_string('EDIT_NEW_TITLE')
-        self.title(localization.get_string('EDIT_TITLE', id=title_id))
-
-        if layout_config.get('type') == 'Universal':
-            self.geometry("900x850")
-        else:
-            self.geometry("600x800")
-
+class EditMappingDialog(QDialog):
+    def __init__(self, parent, mapping_data, index, layout_config):
+        super().__init__(parent)
         self.mapping_data = mapping_data
         self.index = index
-        self.master_app = master
+        self.master_app = parent
         self.layout_config = layout_config
 
-        self.grid_columnconfigure(1, weight=1)
-        self.create_widgets()
-        self.grab_set()
-        self.transient(master)
-        self.after(100, lambda: self.attributes("-topmost", True))
+        title_id = mapping_data['id'] if mapping_data['id'] != 'NEW' else localization.get_string('EDIT_NEW_TITLE')
+        self.setWindowTitle(localization.get_string('EDIT_TITLE', id=title_id))
+        self.resize(700, 800)
 
-    def open_key_menu(self):
-        KeySelectionWindow(self, self.keys_entry)
+        self.setup_ui()
 
-    def insert_delay(self):
-        current_text = self.keys_entry.get().strip()
-        delay_tag = "{WAIT:0.1}"
-        if current_text and not current_text.endswith("+") and not current_text.endswith(" "):
-            new_text = f"{current_text} + {delay_tag}"
-        else:
-            new_text = f"{current_text}{delay_tag}"
-        self.keys_entry.delete(0, 'end')
-        self.keys_entry.insert(0, new_text)
+    def setup_ui(self):
+        main_layout = QVBoxLayout(self)
 
-    def map_midi_pad(self, midi_id, midi_type):
-        self.type_var.set(midi_type)
-        self.id_entry.delete(0, 'end')
-        self.id_entry.insert(0, str(midi_id))
-        self.visualizer.update_states(self.master_app.mappings_data,
-                                      current_selection={'type': midi_type, 'id': midi_id})
+        # Form Layout
+        form_frame = QFrame()
+        grid = QGridLayout(form_frame)
 
-    def create_widgets(self):
-        input_frame = ctk.CTkFrame(self, fg_color="transparent")
-        input_frame.pack(fill="x", padx=10, pady=10)
-        input_frame.grid_columnconfigure(1, weight=1)
+        # MIDI ID
+        grid.addWidget(QLabel(localization.get_string('EDIT_MIDI_ID')), 0, 0)
 
-        row = 0
-        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_MIDI_ID'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w")
-        self.type_var = ctk.StringVar(value=self.mapping_data['type'])
-        ctk.CTkOptionMenu(input_frame, values=["note", "cc"], variable=self.type_var, width=80).grid(row=row, column=1, sticky="w", padx=5)
-        self.id_entry = ctk.CTkEntry(input_frame, placeholder_text="ID", width=80)
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["note", "cc"])
+        self.type_combo.setCurrentText(self.mapping_data['type'])
+        grid.addWidget(self.type_combo, 0, 1)
+
+        self.id_entry = QLineEdit()
         curr_id = str(self.mapping_data['id']) if self.mapping_data['id'] != 'NEW' else ''
-        self.id_entry.insert(0, curr_id)
-        self.id_entry.grid(row=row, column=1, padx=(100, 0), sticky="w")
+        self.id_entry.setText(curr_id)
+        self.id_entry.setPlaceholderText("ID (0-127)")
+        grid.addWidget(self.id_entry, 0, 2)
 
-        # --- KEYS ROW ---
-        row += 1
-        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_KEYS'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
+        # Keys
+        grid.addWidget(QLabel(localization.get_string('EDIT_KEYS')), 1, 0)
         keys_str = " + ".join(self.mapping_data['keys_str'])
-        self.keys_entry = ctk.CTkEntry(input_frame, placeholder_text="Click button ->")
-        self.keys_entry.insert(0, keys_str)
-        self.keys_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=5)
+        self.keys_entry = QLineEdit(keys_str)
+        grid.addWidget(self.keys_entry, 1, 1, 1, 2)
 
-        # Keys Buttons Frame
-        keys_btn_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
-        keys_btn_frame.grid(row=row, column=2, sticky="e")
-        ctk.CTkButton(keys_btn_frame, text="⏱️ Delay", width=60, command=self.insert_delay, fg_color="gray40").pack(side="left", padx=2)
-        ctk.CTkButton(keys_btn_frame, text="⌨️", width=40, command=self.open_key_menu).pack(side="left")
+        btn_box = QHBoxLayout()
+        btn_delay = QPushButton("⏱️ Delay")
+        btn_delay.clicked.connect(self.insert_delay)
+        btn_key = QPushButton("⌨️")
+        btn_key.clicked.connect(self.open_key_menu)
+        btn_box.addWidget(btn_delay)
+        btn_box.addWidget(btn_key)
+        grid.addLayout(btn_box, 1, 3)
 
-        # --- MODE & DESC ---
-        row += 1
-        ctk.CTkLabel(input_frame, text="Mode:", font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
-        self.mode_var = ctk.StringVar(value=self.mapping_data.get('mode', 'One-Shot'))
-        ctk.CTkOptionMenu(input_frame, values=["Common-KB", "One-Shot", "Loop", "Toggle (Hold)"], variable=self.mode_var).grid(row=row, column=1, sticky="w", padx=5)
+        # Mode
+        grid.addWidget(QLabel("Mode:"), 2, 0)
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Common-KB", "One-Shot", "Loop", "Toggle (Hold)"])
+        self.mode_combo.setCurrentText(self.mapping_data.get('mode', 'One-Shot'))
+        grid.addWidget(self.mode_combo, 2, 1, 1, 2)
 
-        row += 1
-        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_DESC'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
-        self.desc_entry = ctk.CTkEntry(input_frame)
-        self.desc_entry.insert(0, self.mapping_data['description'])
-        self.desc_entry.grid(row=row, column=1, columnspan=2, sticky="ew", padx=5)
+        # Desc
+        grid.addWidget(QLabel(localization.get_string('EDIT_DESC')), 3, 0)
+        self.desc_entry = QLineEdit(self.mapping_data['description'])
+        grid.addWidget(self.desc_entry, 3, 1, 1, 2)
 
-        # --- COLOR ---
-        row += 1
-        ctk.CTkLabel(input_frame, text=localization.get_string('EDIT_COLOR'), font=ctk.CTkFont(weight="bold")).grid(row=row, column=0, sticky="w", pady=5)
-        color_sub_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
-        color_sub_frame.grid(row=row, column=1, columnspan=2, sticky="ew", padx=5)
+        # Color
+        grid.addWidget(QLabel(localization.get_string('EDIT_COLOR')), 4, 0)
+        color_layout = QHBoxLayout()
+        self.color_combo = QComboBox()
 
         initial_color = self.mapping_data.get('color', 0)
         color_names = list(constants.LAUNCHPAD_COLORS.values())
-        initial_color_name = next((v for k, v in constants.LAUNCHPAD_COLORS.items() if k == initial_color), localization.get_string('COLOR_CUSTOM'))
+        self.color_combo.addItems(color_names)
 
-        self.color_var = ctk.StringVar(value=initial_color_name)
-        self.color_select = ctk.CTkOptionMenu(color_sub_frame, values=color_names, variable=self.color_var, width=150, command=self._on_preset_color_select)
-        self.color_select.pack(side="left")
-        self.manual_color_entry = ctk.CTkEntry(color_sub_frame, width=50, placeholder_text="0-127")
-        self.manual_color_entry.insert(0, str(initial_color))
-        self.manual_color_entry.pack(side="left", padx=5)
+        initial_name = next((v for k, v in constants.LAUNCHPAD_COLORS.items() if k == initial_color), localization.get_string('COLOR_CUSTOM'))
+        if initial_name not in color_names:
+            self.color_combo.addItem(initial_name)
+        self.color_combo.setCurrentText(initial_name)
+        self.color_combo.currentTextChanged.connect(self._on_preset_color_select)
 
-        # Separator
-        ctk.CTkFrame(self, height=2, fg_color="gray40").pack(fill="x", padx=10, pady=5)
+        self.manual_color_entry = QLineEdit(str(initial_color))
+        self.manual_color_entry.setFixedWidth(50)
+
+        color_layout.addWidget(self.color_combo)
+        color_layout.addWidget(self.manual_color_entry)
+        grid.addLayout(color_layout, 4, 1, 1, 2)
+
+        main_layout.addWidget(form_frame)
 
         # Virtual Pad
-        ctk.CTkLabel(self, text=localization.get_string('EDIT_VIRTUAL_PAD', layout=self.layout_config.get('type')), font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        main_layout.addWidget(QLabel(localization.get_string('EDIT_VIRTUAL_PAD', layout=self.layout_config.get('type'))))
 
-        pad_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        pad_container.pack(fill="both", expand=True, padx=25)
-
-        # FIX SCROLL
-        bind_linux_scroll(pad_container)
-
+        self.scroll_area = QScrollArea()
         self.visualizer = VirtualPadVisualizer(
-            pad_container,
-            self.layout_config,
+            layout_config=self.layout_config,
             button_callback=self.map_midi_pad,
-            btn_size=50 if self.layout_config.get('type') != 'Universal' else 25
+            btn_size=45 if self.layout_config.get('type') != 'Universal' else 25
         )
-        self.visualizer.pack()
-        self.visualizer.update_states(self.master_app.mappings_data, current_selection={'type': self.mapping_data['type'], 'id': self.mapping_data['id']})
+        self.scroll_area.setWidget(self.visualizer)
+        self.scroll_area.setWidgetResizable(True)
+        main_layout.addWidget(self.scroll_area)
+        self.visualizer.update_states(self.master_app.mappings_data,
+                                      current_selection={'type': self.mapping_data['type'], 'id': self.mapping_data['id']})
 
         # Buttons
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(fill="x", pady=10)
-        ctk.CTkButton(btn_frame, text=localization.get_string('EDIT_SAVE'), command=self.save_and_close).pack(side="left", expand=True, padx=10)
-        ctk.CTkButton(btn_frame, text=localization.get_string('EDIT_CANCEL'), command=self.destroy, fg_color="gray").pack(side="left", expand=True, padx=10)
+        bbox = QHBoxLayout()
+        save_btn = QPushButton(localization.get_string('EDIT_SAVE'))
+        save_btn.clicked.connect(self.save_and_close)
+        cancel_btn = QPushButton(localization.get_string('EDIT_CANCEL'))
+        cancel_btn.clicked.connect(self.reject)
+
+        bbox.addWidget(save_btn)
+        bbox.addWidget(cancel_btn)
+        main_layout.addLayout(bbox)
+
+    def insert_delay(self):
+        text = self.keys_entry.text().strip()
+        tag = "{WAIT:0.1}"
+        new_text = f"{text} + {tag}" if (text and not text.endswith("+")) else f"{text}{tag}"
+        self.keys_entry.setText(new_text)
+
+    def open_key_menu(self):
+        KeySelectionDialog(self, self.keys_entry).exec()
 
     def _on_preset_color_select(self, choice):
         for k, v in constants.LAUNCHPAD_COLORS.items():
             if v == choice:
-                self.manual_color_entry.delete(0, 'end')
-                self.manual_color_entry.insert(0, str(k))
+                self.manual_color_entry.setText(str(k))
                 return
 
+    def map_midi_pad(self, midi_id, midi_type):
+        self.type_combo.setCurrentText(midi_type)
+        self.id_entry.setText(str(midi_id))
+        self.visualizer.update_states(self.master_app.mappings_data,
+                                      current_selection={'type': midi_type, 'id': midi_id})
+
     def save_and_close(self):
-        try: new_id_val = int(self.id_entry.get().strip())
+        try: new_id_val = int(self.id_entry.text().strip())
         except ValueError:
-            self.master_app.update_status_label(localization.get_string('STATUS_ID_ERROR'), is_error=True)
+            QMessageBox.critical(self, "Error", localization.get_string('STATUS_ID_ERROR'))
             return
 
-        new_type = self.type_var.get()
-        new_desc = self.desc_entry.get().strip()
-        new_mode = self.mode_var.get()
-        new_keys_raw = self.keys_entry.get().strip()
+        new_type = self.type_combo.currentText()
+        new_desc = self.desc_entry.text().strip()
+        new_mode = self.mode_combo.currentText()
+        new_keys_raw = self.keys_entry.text().strip()
         new_keys_list = [k.strip() for k in new_keys_raw.replace(' ', '').split('+') if k.strip()]
 
         try:
-            new_color = int(self.manual_color_entry.get().strip())
+            new_color = int(self.manual_color_entry.text().strip())
             if not 0 <= new_color <= 127: raise ValueError
         except ValueError:
-            self.master_app.update_status_label(localization.get_string('STATUS_COLOR_ERROR'), is_error=True)
+            QMessageBox.critical(self, "Error", localization.get_string('STATUS_COLOR_ERROR'))
             return
 
         current_id_str = str(self.mapping_data['id'])
         if current_id_str != str(new_id_val) or current_id_str == 'NEW':
             if self.master_app.is_duplicate_mapping(new_type, new_id_val, self.index):
-                self.master_app.update_status_label(localization.get_string('STATUS_MAPPING_USED', type=new_type.upper(), id=new_id_val), is_error=True)
+                QMessageBox.critical(self, "Error", localization.get_string('STATUS_MAPPING_USED', type=new_type.upper(), id=new_id_val))
                 return
 
         self.master_app.mappings_data[self.index].update({
@@ -1140,68 +911,22 @@ class EditMappingWindow(ctk.CTkToplevel):
             'description': new_desc, 'color': new_color, 'mode': new_mode
         })
         self.master_app.update_mappings()
-        self.destroy()
+        self.accept()
 
-class MappingTableFrame(ctk.CTkScrollableFrame):
-    def __init__(self, master, app_instance, mappings_data, **kwargs):
-        super().__init__(master, label_text=localization.get_string('MAPPING_LIST_LABEL'), **kwargs)
-        self.app_master = app_instance
-        self.grid_columnconfigure(3, weight=1)
-        self.create_widgets(mappings_data)
-        bind_linux_scroll(self)
+class App(QMainWindow):
+    # --- SIGNALS FOR THREAD COMMUNICATION ---
+    sig_status_update = pyqtSignal(str, bool)
+    sig_start_feedback = pyqtSignal(object, str, str) # id, color_on, color_off
+    sig_stop_feedback = pyqtSignal(object)
+    sig_hw_feedback = pyqtSignal(object, int)
+    sig_stop_hw_feedback = pyqtSignal(object)
 
-    def refresh_table(self, mappings_data):
-        for widget in self.winfo_children(): widget.destroy()
-        self.create_widgets(mappings_data)
-
-    def create_widgets(self, mappings_data):
-        ctk.CTkButton(self, text=localization.get_string('ADD_MAPPING_BTN'), command=self.app_master.add_new_mapping).grid(row=0, column=0, columnspan=7, sticky="ew", pady=5)
-
-        headers = ["#", "MIDI", "Keys", "Mode", "Desc", "", ""]
-        for i, h in enumerate(headers):
-            ctk.CTkLabel(self, text=h, font=("Arial", 12, "bold")).grid(row=1, column=i, padx=5, sticky="w")
-
-        for i, m in enumerate(mappings_data):
-            if m['id'] == 'NEW': continue
-            r = i + 2
-            ctk.CTkLabel(self, text=f"{i+1}").grid(row=r, column=0, padx=5)
-            ctk.CTkLabel(self, text=f"{m['type'][0].upper()}:{m['id']}").grid(row=r, column=1, padx=5, sticky="w")
-
-            display_keys = []
-            for k in m['keys_str']:
-                if "WAIT" in k: display_keys.append("🕒")
-                else: display_keys.append(constants.KEY_DISPLAY_MAPPINGS.get(k, k))
-
-            key_text = " + ".join(display_keys)
-            if len(key_text) > 20: key_text = key_text[:17] + "..."
-            ctk.CTkLabel(self, text=key_text).grid(row=r, column=2, padx=5, sticky="w")
-
-            # Mode Label
-            mode_short = m.get('mode', 'One-Shot')
-            if mode_short == "Toggle (Hold)": mode_short = "Toggle"
-            ctk.CTkLabel(self, text=mode_short, text_color="gray70", font=("Arial", 10)).grid(row=r, column=3, padx=5, sticky="w")
-
-            desc = m['description']
-            if len(desc) > 20: desc = desc[:17] + "..."
-            ctk.CTkLabel(self, text=desc).grid(row=r, column=4, padx=5, sticky="w")
-
-            ctk.CTkButton(self, text="✎", width=30, command=lambda x=i: self.app_master.open_edit_window(x)).grid(row=r, column=5, padx=2)
-            ctk.CTkButton(self, text="🗑️", width=30, fg_color="firebrick", command=lambda x=i: self.app_master.delete_mapping(x)).grid(row=r, column=6, padx=2)
-
-# --- 6. MAIN APP ---
-
-class App(ctk.CTk):
     def __init__(self, port_name, output_port_name):
         super().__init__()
 
+        # Logic Init
         self.settings = SettingsManager.load()
-        ctk.set_appearance_mode(self.settings.get("theme", "Dark"))
         localization.set_language(self.settings.get("language", "EN"))
-
-        self.lang_options = localization.get_available_languages()
-        self.language_var = ctk.StringVar(value=localization.CURRENT_LANG)
-        self.language_var.trace_add("write", self.change_language)
-
         self.layouts = load_layouts()
         self.current_layout_name = self.settings.get("last_layout", next(iter(self.layouts.keys()), "Universal (All MIDI IDs)"))
         if self.current_layout_name not in self.layouts:
@@ -1221,208 +946,328 @@ class App(ctk.CTk):
         self.listener_thread = None
         self.midi_output = self.open_midi_output()
 
-        self.title(localization.get_string('APP_TITLE'))
-        self.geometry("1100x700")
+        # Connect Logic
+        MACRO_EXECUTOR.app = self
 
-        self.legacy_mode_var = ctk.BooleanVar(value=self.settings.get("legacy_colors", False))
-
-        # --- GRID CONFIGURATION FOR MAIN WINDOW FILL ---
-        self.grid_rowconfigure(0, weight=0) # Header
-        self.grid_rowconfigure(1, weight=1) # Content (Must expand)
-        self.grid_columnconfigure(0, weight=1)
-
-        self.create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)
-
-        # --- Active Feedback ---
-        self.active_feedback = {}  # {mapping_id: {"state": bool, "color_on": "#00FF00", "color_off": "#303030"}}
+        # Feedback state
+        self.active_feedback = {}
         self.feedback_running = False
-
-        # --- HW Feedback ---
-        self.hw_feedback = {}       # {mapping_id: {"state": True/False, "color": int}}
+        self.hw_feedback = {}
         self.hw_feedback_running = False
 
-        try:
-            MACRO_EXECUTOR.app = self
-        except NameError:
-            # Защита на случай, если MACRO_EXECUTOR ещё не создан — но в текущей структуре он уже создан
-            pass
+        # GUI Init
+        self.setWindowTitle(localization.get_string('APP_TITLE'))
+        self.resize(1190, 600)
+        self.setup_ui()
+        self.connect_signals()
 
         if INPUT_MANAGER.init_error:
-            self.after(100, lambda: self.update_status_label(localization.get_string('STATUS_ERROR', error=INPUT_MANAGER.init_error), is_error=True))
+            self.update_status_label(localization.get_string('STATUS_ERROR', error=INPUT_MANAGER.init_error), is_error=True)
 
-    def save_app_settings(self):
-        self.settings.update({
-            "language": self.language_var.get(),
-            "theme": ctk.get_appearance_mode(),
-            "legacy_colors": self.legacy_mode_var.get(),
-            "last_profile": self.current_profile_name,
-            "last_layout": self.current_layout_name
-        })
-        SettingsManager.save(self.settings)
+    def setup_ui(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
 
-    def get_safe_color(self, color_value):
-        if self.legacy_mode_var.get():
-            return COLOR_TRANSLATION_TABLE.get(color_value, color_value)
-        return color_value
+        # Header
+        header = QHBoxLayout()
+        title = QLabel(localization.get_string('MIDI_MAPPER'))
+        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        header.addWidget(title)
 
-    def refresh_lights(self):
-        if self.listener_thread and self.listener_thread.is_alive():
-            self.listener_thread.send_initial_lighting()
-        self.save_app_settings()
+        header.addStretch()
 
-    def create_widgets(self):
-        for widget in self.winfo_children(): widget.destroy()
+        header.addWidget(QLabel(localization.get_string('PROFILE_LABEL')))
+        self.profile_combo = QComboBox()
+        self.refresh_profile_list()
+        self.profile_combo.currentTextChanged.connect(self.change_profile)
+        header.addWidget(self.profile_combo)
 
-        # --- HEADER (Top) ---
-        header_frame = ctk.CTkFrame(self, height=50, fg_color="transparent")
-        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+        header.addWidget(QLabel(localization.get_string('LAYOUT_LABEL')))
+        self.layout_combo = QComboBox()
+        self.layout_combo.addItems(list(self.layouts.keys()))
+        self.layout_combo.setCurrentText(self.current_layout_name)
+        self.layout_combo.currentTextChanged.connect(self.change_layout)
+        header.addWidget(self.layout_combo)
 
-        ctk.CTkLabel(header_frame, text=localization.get_string('MIDI_MAPPER'), font=("Arial", 20, "bold")).pack(side="left")
+        main_layout.addLayout(header)
 
-        settings_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-        settings_frame.pack(side="right")
+        # Content
+        content = QHBoxLayout()
 
-        ctk.CTkLabel(settings_frame, text=localization.get_string('PROFILE_LABEL')).pack(side="left", padx=5)
-        self.profile_var = ctk.StringVar(value=self.current_profile_name)
-        self.profiles_list = get_available_profiles()
-        profile_options = self.profiles_list + ["---", localization.get_string('PROFILE_NEW')]
-        ctk.CTkOptionMenu(settings_frame, values=profile_options, variable=self.profile_var, command=self.change_profile, width=150).pack(side="left")
+        # Left: Visualizer
+        left_panel = QFrame()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.addWidget(QLabel("Active Mapping View"))
 
-        ctk.CTkLabel(settings_frame, text=localization.get_string('LAYOUT_LABEL')).pack(side="left", padx=(15, 5))
-        self.layout_var = ctk.StringVar(value=self.current_layout_name)
-        ctk.CTkOptionMenu(settings_frame, values=list(self.layouts.keys()), variable=self.layout_var, command=self.change_layout, width=150).pack(side="left")
-
-        # --- MAIN CONTENT AREA (2 Columns) ---
-        content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        content_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
-
-        # FIX: Ensure content frame expands correctly
-        content_frame.grid_columnconfigure(0, weight=0) # Left (Pad) - fixed logic
-        content_frame.grid_columnconfigure(1, weight=1) # Right (Table) - expands
-        content_frame.grid_rowconfigure(0, weight=1)    # Vertical expand
-
-        # LEFT COLUMN: Virtual Pad Visualizer
-        # We assume 450px is enough for the pad visualizer
-        left_frame = ctk.CTkFrame(content_frame, width=450)
-        left_frame.grid(row=0, column=0, sticky="nsw", padx=(0, 10))
-        left_frame.grid_propagate(False) # Force width
-        left_frame.grid_rowconfigure(1, weight=1)
-        left_frame.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(left_frame, text="Active Mapping View", font=("Arial", 14, "bold")).grid(row=0, column=0, pady=10)
-
-        # Container for visualizer to center it
-        pad_container = ctk.CTkFrame(left_frame, fg_color="transparent")
-        pad_container.grid(row=1, column=0, sticky="nsew")
-        pad_container.grid_rowconfigure(0, weight=1)
-        pad_container.grid_columnconfigure(0, weight=1)
-
-        layout_config = self.layouts.get(self.current_layout_name, {})
-
+        self.vis_scroll = QScrollArea()
+        layout_cfg = self.layouts.get(self.current_layout_name, {})
         self.main_visualizer = VirtualPadVisualizer(
-            pad_container,
-            layout_config,
-            btn_size=35 if layout_config.get('type') != 'Universal' else 20
+            layout_config=layout_cfg,
+            btn_size=35 if layout_cfg.get('type') != 'Universal' else 20
         )
-        # Visualizer centers itself via pack(anchor=center) inside render
-        self.main_visualizer.grid(row=0, column=0)
-        self.main_visualizer.update_states(self.mappings_data)
+        self.vis_scroll.setWidget(self.main_visualizer)
+        self.vis_scroll.setWidgetResizable(True)
+        left_layout.addWidget(self.vis_scroll)
 
-        # RIGHT COLUMN: Mapping Table & Controls
-        right_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        right_frame.grid(row=0, column=1, sticky="nsew")
+        content.addWidget(left_panel, 1) # Stretch factor 1
 
-        # FIX: Right frame expansion
-        right_frame.grid_rowconfigure(1, weight=1)
-        right_frame.grid_columnconfigure(0, weight=1)
+        # Right: Table & Controls
+        right_panel = QFrame()
+        right_layout = QVBoxLayout(right_panel)
 
-        # Status Bar
-        self.status_label = ctk.CTkLabel(right_frame, text=localization.get_string('STATUS_READY'), fg_color="gray20", corner_radius=5, anchor="w", padx=10)
-        self.status_label.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        self.status_label = QLabel(localization.get_string('STATUS_READY'))
+        self.status_label.setStyleSheet("color: gray;")
+        right_layout.addWidget(self.status_label)
 
         # Table
-        self.mapping_table = MappingTableFrame(right_frame, self, self.mappings_data)
-        self.mapping_table.grid(row=1, column=0, sticky="nsew")
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(["#", "MIDI", "Keys", "Mode", "Desc", "Edit", "Del"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        right_layout.addWidget(self.table)
 
-        # Bottom Controls
-        ctrl_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
-        ctrl_frame.grid(row=2, column=0, sticky="ew", pady=10)
+        add_btn = QPushButton(localization.get_string('ADD_MAPPING_BTN'))
+        add_btn.clicked.connect(self.add_new_mapping)
+        right_layout.addWidget(add_btn)
 
-        start_text = localization.get_string('START_BTN')
-        fg_color = "green"
+        # Footer Controls
+        footer = QHBoxLayout()
+        self.start_btn = QPushButton(localization.get_string('START_BTN'))
+        self.start_btn.clicked.connect(self.toggle_listener)
+        self.start_btn.setFixedHeight(40)
+        footer.addWidget(self.start_btn)
+
+        self.legacy_check = QCheckBox(localization.get_string('LEGACY_COLORS_LABEL'))
+        self.legacy_check.setChecked(self.settings.get("legacy_colors", False))
+        self.legacy_check.toggled.connect(self.refresh_lights)
+        footer.addWidget(self.legacy_check)
+
+        lang_combo = QComboBox()
+        lang_combo.addItems(localization.get_available_languages())
+        lang_combo.setCurrentText(localization.CURRENT_LANG)
+        lang_combo.currentTextChanged.connect(self.change_language)
+        footer.addWidget(lang_combo)
+
+        right_layout.addLayout(footer)
+        content.addWidget(right_panel, 2) # Stretch factor 2
+
+        main_layout.addLayout(content)
+
+        self.refresh_table()
+        self.main_visualizer.update_states(self.mappings_data)
+
+    def connect_signals(self):
+        self.sig_status_update.connect(self._slot_status_update)
+        self.sig_start_feedback.connect(self._slot_start_feedback)
+        self.sig_stop_feedback.connect(self._slot_stop_feedback)
+        self.sig_hw_feedback.connect(self.start_hw_feedback_impl) # Direct call to logic implementation is safe if logic is just setting variable? NO.
+        # HW feedback logic involves timers. It should be safe to run timers in main thread.
+        # Actually start_hw_feedback logic uses .after in Tkinter. In Qt we use QTimer.
+
+        # Since HW Feedback logic was designed for Tkinter's single thread loop, we can just adapt the methods.
+        # But wait, start_hw_feedback is called from Thread. So we MUST use signal to trigger it on MainThread.
+        pass # Connections are made, logic below.
+
+    # --- WRAPPERS FOR THREAD SAFE CALLS ---
+    def update_status_label(self, text, is_error=False):
+        self.sig_status_update.emit(text, is_error)
+
+    def start_feedback(self, mapping_id, color_on="#ff00dd", color_off="#303030"):
+        self.sig_start_feedback.emit(mapping_id, color_on, color_off)
+
+    def stop_feedback(self, mapping_id):
+        self.sig_stop_feedback.emit(mapping_id)
+
+    def start_hw_feedback(self, mapping_id, color):
+        self.sig_hw_feedback.emit(mapping_id, color)
+
+    def stop_hw_feedback(self, mapping_id):
+        self.sig_stop_hw_feedback.emit(mapping_id)
+
+    # --- SLOTS (Executed on Main Thread) ---
+    @pyqtSlot(str, bool)
+    def _slot_status_update(self, text, is_error):
+        color = "red" if is_error else "gray"
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet(f"color: {color};")
+
+    @pyqtSlot(object, str, str)
+    def _slot_start_feedback(self, mapping_id, color_on, color_off):
+        self.active_feedback[mapping_id] = {
+            "state": True, "color_on": color_on, "color_off": color_off
+        }
+        if not self.feedback_running:
+            self.feedback_running = True
+            QTimer.singleShot(500, self._feedback_tick)
+
+    @pyqtSlot(object)
+    def _slot_stop_feedback(self, mapping_id):
+        if mapping_id in self.active_feedback:
+            del self.active_feedback[mapping_id]
+        if not self.active_feedback:
+            self.feedback_running = False
+            self.main_visualizer.update_states(self.mappings_data)
+
+    def _feedback_tick(self):
+        if not self.feedback_running: return
+
+        to_delete = []
+        for mapping_id, data in self.active_feedback.items():
+            data["state"] = not data["state"]
+            color = data["color_on"] if data["state"] else data["color_off"]
+            btn = self.main_visualizer.get_button_by_id(mapping_id)
+            if btn: self.main_visualizer.set_btn_color(btn, color)
+            else: to_delete.append(mapping_id)
+
+        for d in to_delete: del self.active_feedback[d]
+
+        if self.active_feedback:
+            QTimer.singleShot(500, self._feedback_tick)
+
+    @pyqtSlot(object, int)
+    def start_hw_feedback_impl(self, mapping_id, color):
+        try:
+            restore_color = 0
+            for m in self.mappings_data:
+                if str(m['id']) == str(mapping_id):
+                    restore_color = int(self.get_safe_color(m.get('color', 0)))
+                    break
+        except: restore_color = 0
+
+        self.hw_feedback[mapping_id] = {
+            "state": True, "color": int(color), "orig_color": int(restore_color)
+        }
+        if not self.hw_feedback_running:
+            self.hw_feedback_running = True
+            self._hw_feedback_tick()
+
+    def _hw_feedback_tick(self):
+        if not self.hw_feedback_running: return
+        if not self.hw_feedback:
+            self.hw_feedback_running = False
+            return
+
+        for mapping_id, data in list(self.hw_feedback.items()):
+            data["state"] = not data["state"]
+            velocity = data["color"] if data["state"] else 0
+            try:
+                if self.midi_output:
+                    self.midi_output.send(Message('note_on', note=int(mapping_id), velocity=int(velocity)))
+            except Exception as e: print(e)
+
+        if self.hw_feedback_running and self.hw_feedback:
+            QTimer.singleShot(500, self._hw_feedback_tick)
+        else:
+            self.hw_feedback_running = False
+
+    def stop_hw_feedback_impl(self, mapping_id):
+        # Implementation moved from original stop_hw_feedback
+        try:
+            orig = None
+            if mapping_id in self.hw_feedback:
+                orig = self.hw_feedback[mapping_id].get("orig_color")
+                del self.hw_feedback[mapping_id]
+
+            if not self.hw_feedback: self.hw_feedback_running = False
+
+            restore_color = 0
+            if orig is not None: restore_color = int(orig)
+            else:
+                for m in self.mappings_data:
+                    if str(m["id"]) == str(mapping_id):
+                        restore_color = int(self.get_safe_color(m.get("color", 0)))
+                        break
+
+            if self.midi_output:
+                self.midi_output.send(Message("note_on", note=int(mapping_id), velocity=int(restore_color)))
+        except Exception as e: print(e)
+
+    # --- LOGIC ACTIONS ---
+
+    def refresh_profile_list(self):
+        self.profiles_list = get_available_profiles()
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        self.profile_combo.addItems(self.profiles_list)
+        self.profile_combo.addItem("---")
+        self.profile_combo.addItem(localization.get_string('PROFILE_NEW'))
+        self.profile_combo.setCurrentText(self.current_profile_name)
+        self.profile_combo.blockSignals(False)
+
+    def change_profile(self, choice):
+        if choice == localization.get_string('PROFILE_NEW'):
+            text, ok = QInputDialog.getText(self, localization.get_string('PROFILE_NEW'), localization.get_string('PROFILE_NEW_PROMPT'))
+            if ok and text:
+                filename = f"{text.strip().replace(' ', '_').replace('.json', '')}.json"
+                if filename in self.profiles_list:
+                    self.update_status_label(localization.get_string('STATUS_PROFILE_EXISTS'), is_error=True)
+                    self.profile_combo.setCurrentText(self.current_profile_name)
+                    return
+                new_path = os.path.join(PROFILES_DIR, filename)
+                with open(new_path, 'w', encoding='utf-8') as f:
+                    json.dump({"mappings": []}, f, indent=4)
+                self.current_profile_name = filename
+                self.refresh_profile_list()
+                self.load_profile(filename, is_new=True)
+            else:
+                self.profile_combo.setCurrentText(self.current_profile_name)
+        elif choice != "---":
+            self.load_profile(choice)
+
+    def load_profile(self, filename, is_new=False):
+        self.current_profile_name = filename
+        self.save_app_settings()
+        self.key_map, self.cc_map, self.mappings_data = load_profile_data(self.current_profile_name)
+        self.refresh_table()
+        self.main_visualizer.update_states(self.mappings_data)
+        self.update_status_label(f"Profile loaded: {filename}")
         if self.listener_thread and self.listener_thread.is_alive():
-            start_text = localization.get_string('STOP_BTN')
-            fg_color = "red"
-        state = "normal" if not INPUT_MANAGER.init_error else "disabled"
-
-        self.toggle_btn = ctk.CTkButton(ctrl_frame, text=start_text, command=self.toggle_listener, fg_color=fg_color, state=state, height=40)
-        self.toggle_btn.pack(side="left", fill="x", expand=True, padx=(0, 10))
-
-        misc_frame = ctk.CTkFrame(ctrl_frame, fg_color="transparent")
-        misc_frame.pack(side="right")
-
-        self.legacy_switch = ctk.CTkSwitch(misc_frame, text=localization.get_string('LEGACY_COLORS_LABEL'), variable=self.legacy_mode_var, command=self.refresh_lights)
-        self.legacy_switch.pack(side="left", padx=10)
-
-        ctk.CTkButton(misc_frame, text=localization.get_string('THEME_BTN'), width=60, command=self.toggle_theme).pack(side="left", padx=5)
-
-        ctk.CTkOptionMenu(misc_frame, values=self.lang_options, variable=self.language_var, width=70).pack(side="left")
-
-
-    def change_language(self, *args):
-        new_lang = self.language_var.get()
-        if localization.set_language(new_lang):
-            self.save_app_settings()
-            self.create_widgets()
+            self.refresh_lights()
 
     def change_layout(self, choice):
         self.current_layout_name = choice
         self.save_app_settings()
-        self.create_widgets()
-
-    def create_new_profile(self):
-        dialog = ctk.CTkInputDialog(text=localization.get_string('PROFILE_NEW_PROMPT'), title=localization.get_string('PROFILE_NEW'))
-        new_name = dialog.get_input()
-        if new_name:
-            filename = f"{new_name.strip().replace(' ', '_').replace('.json', '')}.json"
-            if filename in self.profiles_list:
-                self.update_status_label(localization.get_string('STATUS_PROFILE_EXISTS'), is_error=True)
-                return
-            new_path = os.path.join(PROFILES_DIR, filename)
-            try:
-                with open(new_path, 'w', encoding='utf-8') as f:
-                    json.dump({"mappings": []}, f, indent=4)
-                self.current_profile_name = filename
-                self.profiles_list = get_available_profiles()
-                self.change_profile(filename, is_new=True)
-            except Exception as e:
-                self.update_status_label(localization.get_string('STATUS_ERROR', error=f"New profile save failed: {e}"), is_error=True)
-
-    def change_profile(self, choice, is_new=False):
-        if choice == localization.get_string('PROFILE_NEW'):
-            self.create_new_profile()
-            return
-        if choice == "---" or choice == self.current_profile_name:
-            self.profile_var.set(self.current_profile_name)
-            return
-
-        self.current_profile_name = choice
-        self.save_app_settings()
-        self.key_map, self.cc_map, self.mappings_data = load_profile_data(self.current_profile_name)
-
-        self.mapping_table.refresh_table(self.mappings_data)
+        # Recreate visualizer logic
+        self.vis_scroll.takeWidget() # Remove old
+        layout_cfg = self.layouts.get(self.current_layout_name, {})
+        self.main_visualizer = VirtualPadVisualizer(
+            layout_config=layout_cfg,
+            btn_size=35 if layout_cfg.get('type') != 'Universal' else 20
+        )
+        self.vis_scroll.setWidget(self.main_visualizer)
         self.main_visualizer.update_states(self.mappings_data)
-        self.profile_var.set(self.current_profile_name)
 
-        status_msg = f"Profile loaded: {choice}" if not is_new else f"Profile created: {choice}"
-        self.update_status_label(status_msg)
-        if self.listener_thread and self.listener_thread.is_alive():
-             self.refresh_lights()
+    def refresh_table(self):
+        self.table.setRowCount(0)
+        for i, m in enumerate(self.mappings_data):
+            if m['id'] == 'NEW': continue
+            row = self.table.rowCount()
+            self.table.insertRow(row)
 
-    def open_midi_output(self):
-        try: return open_output(self.output_port_name) if self.output_port_name else None
-        except: return None
+            self.table.setItem(row, 0, QTableWidgetItem(str(i+1)))
+            self.table.setItem(row, 1, QTableWidgetItem(f"{m['type'][0].upper()}:{m['id']}"))
+
+            display_keys = []
+            for k in m['keys_str']:
+                if "WAIT" in k: display_keys.append("🕒")
+                else: display_keys.append(constants.KEY_DISPLAY_MAPPINGS.get(k, k))
+            self.table.setItem(row, 2, QTableWidgetItem(" + ".join(display_keys)))
+
+            self.table.setItem(row, 3, QTableWidgetItem(m.get('mode', 'One-Shot')))
+            self.table.setItem(row, 4, QTableWidgetItem(m['description']))
+
+            edit_btn = QPushButton("✎")
+            edit_btn.clicked.connect(lambda _, x=i: self.open_edit_window(x))
+            self.table.setCellWidget(row, 5, edit_btn)
+
+            del_btn = QPushButton("🗑️")
+            del_btn.setStyleSheet("color: red;")
+            del_btn.clicked.connect(lambda _, x=i: self.delete_mapping(x))
+            self.table.setCellWidget(row, 6, del_btn)
 
     def add_new_mapping(self):
         self.mappings_data.append({
@@ -1433,7 +1278,8 @@ class App(ctk.CTk):
 
     def open_edit_window(self, index):
         current_layout = self.layouts.get(self.current_layout_name, {})
-        EditMappingWindow(self, self.mappings_data[index], index, current_layout)
+        dlg = EditMappingDialog(self, self.mappings_data[index], index, current_layout)
+        dlg.exec()
 
     def delete_mapping(self, index):
         del self.mappings_data[index]
@@ -1442,13 +1288,11 @@ class App(ctk.CTk):
     def update_mappings(self):
         self.mappings_data = [m for m in self.mappings_data if m['id'] != 'NEW']
         save_profile_data(self.mappings_data, self.current_profile_name)
-        self.mapping_table.refresh_table(self.mappings_data)
+        self.refresh_table()
         self.main_visualizer.update_states(self.mappings_data)
 
         self.key_map = {}
         self.cc_map = {}
-        # Перезагружаем через load_profile logic чтобы распарсить паузы корректно
-        # Можно оптимизировать, но так надежнее для единообразия
         temp_km, temp_ccm, _ = load_profile_data(self.current_profile_name)
         self.key_map = temp_km
         self.cc_map = temp_ccm
@@ -1463,32 +1307,6 @@ class App(ctk.CTk):
             if m['type'] == m_type and str(m['id']) == str(m_id): return True
         return False
 
-    def stop_all_feedbacks(self):
-        """Останавливает все GUI и HW фидбеки (использовать при STOP/clear)."""
-        # Остановим GUI мигание
-        try:
-            self.active_feedback.clear()
-            self.feedback_running = False
-            if hasattr(self, "main_visualizer"):
-                self.main_visualizer.update_states(self.mappings_data)
-        except Exception as e:
-            print("[FEEDBACK] stop_all_feedbacks gui error:", e)
-
-        # Остановим HW мигание и восстановим цвета
-        try:
-            # делаем копию списка ключей чтобы безопасно итерировать
-            for mid in list(self.hw_feedback.keys()):
-                try:
-                    self.stop_hw_feedback(mid)
-                except Exception as e:
-                    print(f"[FEEDBACK] stop_hw_feedback error for {mid}: {e}")
-            # окончательно очистим словарь и флаг
-            self.hw_feedback.clear()
-            self.hw_feedback_running = False
-        except Exception as e:
-            print("[FEEDBACK] stop_all_feedbacks hw error:", e)
-
-
     def toggle_listener(self):
         if INPUT_MANAGER.init_error:
              self.update_status_label(f"❌ Cannot Start: {INPUT_MANAGER.init_error}", is_error=True)
@@ -1497,12 +1315,24 @@ class App(ctk.CTk):
         if not self.listener_thread or not self.listener_thread.is_alive():
             self.listener_thread = MidiListenerThread(self, self.port_name)
             self.listener_thread.start()
-            self.toggle_btn.configure(text=localization.get_string('STOP_BTN'), fg_color="red")
+            self.start_btn.setText(localization.get_string('STOP_BTN'))
+            self.start_btn.setStyleSheet("background-color: #0b65db; color: white;") # Blue
         else:
             self.listener_thread.stop()
             self.clear_launchpad()
             self.stop_all_feedbacks()
-            self.toggle_btn.configure(text=localization.get_string('START_BTN'), fg_color="green")
+            self.start_btn.setText(localization.get_string('START_BTN'))
+            self.start_btn.setStyleSheet("") # Reset style
+
+    def stop_all_feedbacks(self):
+        self.active_feedback.clear()
+        self.feedback_running = False
+        self.main_visualizer.update_states(self.mappings_data)
+
+        for mid in list(self.hw_feedback.keys()):
+            self.stop_hw_feedback_impl(mid)
+        self.hw_feedback.clear()
+        self.hw_feedback_running = False
 
     def clear_launchpad(self):
         if self.midi_output:
@@ -1512,185 +1342,51 @@ class App(ctk.CTk):
                         mid_id = int(m['id'])
                         if m['type'] == 'note': self.midi_output.send(Message('note_on', note=mid_id, velocity=0))
                         elif m['type'] == 'cc': self.midi_output.send(Message('control_change', control=mid_id, value=0))
-                    except (ValueError, TypeError): pass
+                    except: pass
             except Exception as e: print(f"Clear Error: {e}")
 
-    def update_status_label(self, text, is_error=False):
-        color = "firebrick" if is_error else "gray20"
-        self.status_label.configure(text=text, fg_color=color)
-
-    def toggle_theme(self):
-        curr = ctk.get_appearance_mode()
-        new_theme = "Light" if curr=="Dark" else "Dark"
-        ctk.set_appearance_mode(new_theme)
+    def refresh_lights(self):
+        if self.listener_thread and self.listener_thread.is_alive():
+            self.listener_thread.send_initial_lighting()
         self.save_app_settings()
-        self.create_widgets()
 
-    def on_closing(self):
+    def change_language(self, lang):
+        if localization.set_language(lang):
+            self.save_app_settings()
+            # In PyQt fully reloading texts requires re-setting text on all widgets.
+            # For simplicity, we restart UI creation or user restarts app.
+            # Here just saving settings.
+            QMessageBox.information(self, "Language", "Language changed. Please restart app to apply all texts.")
+
+    def get_safe_color(self, color_value):
+        if self.legacy_check.isChecked():
+            return COLOR_TRANSLATION_TABLE.get(color_value, color_value)
+        return color_value
+
+    def save_app_settings(self):
+        self.settings.update({
+            "legacy_colors": self.legacy_check.isChecked(),
+            "last_profile": self.current_profile_name,
+            "last_layout": self.current_layout_name,
+            "language": localization.CURRENT_LANG
+        })
+        SettingsManager.save(self.settings)
+
+    def open_midi_output(self):
+        try: return open_output(self.output_port_name) if self.output_port_name else None
+        except: return None
+
+    def closeEvent(self, event):
         self.save_app_settings()
         self.clear_launchpad()
         if self.listener_thread: self.listener_thread.stop()
         if self.midi_output: self.midi_output.close()
-        self.destroy()
-
-    def start_feedback(self, mapping_id, color_on="#00FF00", color_off="#303030"):
-        """Запускает мигающий фидбек для Loop или Toggle."""
-        self.active_feedback[mapping_id] = {
-            "state": True,
-            "color_on": color_on,
-            "color_off": color_off,
-        }
-
-        if not self.feedback_running:
-            self.feedback_running = True
-            self._feedback_tick()
-
-
-    def stop_feedback(self, mapping_id):
-        """Останавливает мигающий фидбек."""
-        if mapping_id in self.active_feedback:
-            del self.active_feedback[mapping_id]
-
-        # Если фидбеков больше нет — выключаем цикл
-        if not self.active_feedback:
-            self.feedback_running = False
-            # Восстанавливаем GUI-вид (цвета кнопок) к текущим маппингам
-            try:
-                # Обновим визуализатор целиком — проще и надежнее
-                if hasattr(self, "main_visualizer"):
-                    self.main_visualizer.update_states(self.mappings_data)
-            except Exception as e:
-                print(f"[FEEDBACK] restore error: {e}")
-
-
-
-    def _feedback_tick(self):
-        """Мигание 2Hz."""
-        if not self.feedback_running:
-            return
-
-        to_delete = []
-
-        for mapping_id, data in self.active_feedback.items():
-            data["state"] = not data["state"]
-            color = data["color_on"] if data["state"] else data["color_off"]
-
-            # обновим кнопку на Launchpad preview
-            btn = self.main_visualizer.get_button_by_id(mapping_id)
-            if btn:
-                try:
-                    btn.configure(fg_color=color)
-                except:
-                    pass
-            else:
-                to_delete.append(mapping_id)
-
-        # чистим устаревшие (кнопки, у которых нет визуализатора)
-        for dead in to_delete:
-            del self.active_feedback[dead]
-
-        self.after(500, self._feedback_tick)  # мигание 2 раза в секунду
-
-    def start_hw_feedback(self, mapping_id, color):
-        """Запускает мигание на физическом устройстве. Сохраняет оригинальный цвет для restore."""
-        # определяем restore_color — если mapping есть, берём безопасный цвет, иначе 0
-        try:
-            restore_color = 0
-            for m in self.mappings_data:
-                try:
-                    if int(m['id']) == int(mapping_id):
-                        restore_color = int(self.get_safe_color(m.get('color', 0)))
-                        break
-                except Exception:
-                    pass
-        except Exception:
-            restore_color = 0
-
-        # сохраняем структуру: цвет для мигания + оригинал
-        self.hw_feedback[mapping_id] = {
-            "state": True,
-            "color": int(color),
-            "orig_color": int(restore_color)
-        }
-
-        if not self.hw_feedback_running:
-            self.hw_feedback_running = True
-            # запускаем тик (через after — безопаснее для Tk)
-            self._hw_feedback_tick()
-
-
-
-    def stop_hw_feedback(self, mapping_id):
-        """Останавливает мигание на Launchpad и восстанавливает цвет."""
-        try:
-            # Сначала попробуем прочитать сохранённый оригинал
-            orig = None
-            if mapping_id in self.hw_feedback:
-                orig = self.hw_feedback[mapping_id].get("orig_color")
-
-            # удаляем запись (чтобы не мигать больше)
-            if mapping_id in self.hw_feedback:
-                del self.hw_feedback[mapping_id]
-
-            # если больше нет записей -- выключаем флаг
-            if not self.hw_feedback:
-                self.hw_feedback_running = False
-
-            # восстанавливаем цвет жестко (используем orig если есть, иначе ищем в mappings)
-            restore_color = None
-            if orig is not None:
-                restore_color = int(orig)
-            else:
-                for m in self.mappings_data:
-                    try:
-                        if int(m["id"]) == int(mapping_id):
-                            restore_color = int(self.get_safe_color(m.get("color", 0)))
-                            break
-                    except Exception:
-                        pass
-            if restore_color is None:
-                restore_color = 0
-
-            # Отправляем сразу восстановление (тонкий/быстрый)
-            if self.midi_output:
-                try:
-                    self.midi_output.send(Message("note_on", note=int(mapping_id), velocity=int(restore_color)))
-                except Exception as e:
-                    print("[HW-FEEDBACK] restore error:", e)
-
-        except Exception as e:
-            print("[HW-FEEDBACK] stop_hw_feedback exception:", e)
-
-
-
-    def _hw_feedback_tick(self):
-        """Периодическое мигание ~2Hz."""
-        if not self.hw_feedback_running:
-            return
-
-        if not self.hw_feedback:
-            # ничего мигать — выключаем флаг и выйдем
-            self.hw_feedback_running = False
-            return
-
-        for mapping_id, data in list(self.hw_feedback.items()):
-            data["state"] = not data["state"]
-            velocity = data["color"] if data["state"] else 0
-            try:
-                if self.midi_output:
-                    self.midi_output.send(Message('note_on', note=int(mapping_id), velocity=int(velocity)))
-            except Exception as e:
-                print("[HW-FEEDBACK] MIDI error:", e)
-
-        # schedule next tick only if still running
-        if self.hw_feedback_running and self.hw_feedback:
-            self.after(500, self._hw_feedback_tick)
-        else:
-            self.hw_feedback_running = False
-
-
+        event.accept()
 
 if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    # Auto-detect ports
     ins = get_input_names()
     outs = get_output_names()
     in_port = next((n for n in ins if "launchpad" in n.lower()), None)
@@ -1698,5 +1394,10 @@ if __name__ == "__main__":
     if not in_port and ins: in_port = ins[0]
     if not out_port and outs: out_port = outs[0]
 
-    app = App(in_port, out_port)
-    app.mainloop()
+    window = App(in_port, out_port)
+    window.show()
+
+    # Connect signals for HW feedback implementation (Wiring the internal signal to slot)
+    window.sig_stop_hw_feedback.connect(window.stop_hw_feedback_impl)
+
+    sys.exit(app.exec())
