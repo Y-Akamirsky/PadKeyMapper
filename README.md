@@ -50,6 +50,23 @@ Map any button on your MIDI device to keyboard shortcuts (Ctrl+C, Ctrl+V, etc), 
 ## 🤝 Contributing
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
+## ➡️ Versioning
+
+  M.m.P.p (v0.0.1.1)
+  
+  Major       - "M"
+  Minor       - "m"
+  Patch       - "P"
+  minor-patch - "p"
+
+## 🪜 Stage
+
+  - [ ] Pre-Alpha   -   0.0.1.p       <--- Now here
+  - [ ] Alpha       -   0.0.2.p
+  - [ ] Beta        -   0.1.P.p
+  - [ ] Release     -   M.m.P.p
+  
+
 ## 🛠 Built With
 
     - Python 3
