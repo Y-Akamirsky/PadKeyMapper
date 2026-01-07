@@ -1,0 +1,1 @@
+/home/akamirsky/Some-scripts/Python/MIDIHK/dist/PadKeyMapper/_internal/customtkinter/windows/widgets/scaling/scaling_base_class.py
