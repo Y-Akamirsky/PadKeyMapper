@@ -1,0 +1,6 @@
+#!/bin/bash
+# Переходим в директорию, где лежат все зависимости и основной бинарник
+PROGRAM_ROOT="/usr/lib/pad-key-mapper"
+cd "$PROGRAM_ROOT"
+# Запускаем твой бинарник PadKeyMapper (без расширения) с помощью интерпретатора Python
+exec ./PadKeyMapper "$@"

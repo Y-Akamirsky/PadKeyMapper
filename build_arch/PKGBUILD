@@ -1,15 +1,15 @@
 # Maintainer: Yaroslav Akamirsky <akamirsky.yaros@gmail.com>
 pkgname=pad-key-mapper
-pkgver=0.0.1.1
-pkgrel=2
-pkgdesc="MIDI to Keystroke Mapper for Midi controllers (Python/CustomTkinter)"
+pkgver=0.0.1.2
+pkgrel=1
+pkgdesc="MIDI to Keystroke Mapper for Midi controllers"
 arch=('x86_64')
 url="https://github.com/Y-Akamirsky/PadKey-Mapper"
 license=('GPL3')
-depends=('python' 'tk')
+depends=('python' 'python-pyqt6' 'libxkbcommon-x11' 'xcb-util-wm' 'xcb-util-image' 'xcb-util-keysyms' 'xcb-util-renderutil')
 makedepends=('python-pip' 'python-setuptools' 'gcc' 'make')
 install=pad-key-mapper.install
-source=("pad-key-mapper.install" "PR-PKMICON.svg") # Остальные файлы берем локально или из src
+source=("pad-key-mapper.install" "PKMICON2.svg") # Остальные файлы берем локально или из src
 sha256sums=('SKIP' 'SKIP')
 
 PKMICON=("PKMICON2.svg")
@@ -20,7 +20,7 @@ prepare() {
 [Desktop Entry]
 Type=Application
 Name=PadKey Mapper
-Comment=Turn your Launchpad into a macro keyboard
+Comment=Turn your MIDI device into a macro keyboard
 Exec=pad-key-mapper
 Icon=PKMPPR
 Terminal=false
